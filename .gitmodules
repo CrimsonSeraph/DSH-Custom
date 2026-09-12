@@ -1,0 +1,3 @@
+[submodule "MCP/game-engine/godot-mcp"]
+	path = MCP/game-engine/godot-mcp
+	url = https://github.com/CrimsonSeraph/godot-mcp.git
