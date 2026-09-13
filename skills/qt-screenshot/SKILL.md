@@ -12,14 +12,14 @@ whenToUse: 需要给 Qt/QML 应用启动窗口并截图，用于视觉检查或�
 
 ## 工具位置
 
-| 脚本                                 | 作用                                                                            |
-| ------------------------------------ | ------------------------------------------------------------------------------- |
-| `<仓库根>/custom/tools/shoot.sh`     | 单尺寸：生成 `cur.qml` → 启动 `qml.exe` → 等窗口 → 抓图 → 校验 → 清理           |
-| `<仓库根>/custom/tools/cap.ps1`      | 按标题/进程定位可见窗口，`PrintWindow` 抓该窗口位图并存 PNG（带 `-TimeoutSec`） |
-| `<仓库根>/custom/tools/run_shots.sh` | 批量：建模块目录 → 离屏烟测 → 逐尺寸抓图 → 汇总                                 |
-| `<仓库根>/custom/tools/preflight.sh` | 前置自检：命令、Qt、残留进程、源目录、`qmldir`、模板标记                        |
-| `<仓库根>/custom/tools/selftest.sh`  | 故意失败测试：证明失败路径有时间上限且返回非 0                                  |
-| `<仓库根>/custom/tools/lib.sh`       | 共用函数（路径转换、PID、PNG 头解析、日志提炼）                                 |
+| 脚本                                    | 作用                                                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------- |
+| `<DSH仓库根>/custom/tools/shoot.sh`     | 单尺寸：生成 `cur.qml` → 启动 `qml.exe` → 等窗口 → 抓图 → 校验 → 清理           |
+| `<DSH仓库根>/custom/tools/cap.ps1`      | 按标题/进程定位可见窗口，`PrintWindow` 抓该窗口位图并存 PNG（带 `-TimeoutSec`） |
+| `<DSH仓库根>/custom/tools/run_shots.sh` | 批量：建模块目录 → 离屏烟测 → 逐尺寸抓图 → 汇总                                 |
+| `<DSH仓库根>/custom/tools/preflight.sh` | 前置自检：命令、Qt、残留进程、源目录、`qmldir`、模板标记                        |
+| `<DSH仓库根>/custom/tools/selftest.sh`  | 故意失败测试：证明失败路径有时间上限且返回非 0                                  |
+| `<DSH仓库根>/custom/tools/lib.sh`       | 共用函数（路径转换、PID、PNG 头解析、日志提炼）                                 |
 
 脚本目录可用环境变量 `QT_SHOT_TOOLS` 覆盖。如果本 skill 被单独复制到
 `$DSH_HOME/skills/`，请把 `custom/tools/` 一并复制过去并设置 `QT_SHOT_TOOLS` 指向它。
@@ -48,7 +48,7 @@ whenToUse: 需要给 Qt/QML 应用启动窗口并截图，用于视觉检查或�
 ## 标准流程
 
 ```bash
-TOOLS=${QT_SHOT_TOOLS:-<仓库根>/custom/tools}
+TOOLS=${QT_SHOT_TOOLS:-<DSH仓库根>/custom/tools}
 WORK=<工作目录>            # 放 mod/、templates/、shots/、logs/
 OUT=<输出目录>
 

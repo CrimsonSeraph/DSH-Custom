@@ -112,7 +112,7 @@ curl -s "$ROUTER/router/models"   # 原始模型清单
 2. **router 没起来 → 先启动 router**：
 
    ```bash
-   cd <仓库根>/custom/tools/LMStudio
+   cd <DSH仓库根>/custom/tools/LMStudio
    PYTHONIOENCODING=utf-8 nohup python lmstudio_router.py serve > /tmp/lmstudio-router.log 2>&1 &
    sleep 6 && curl -s -m 5 "$ROUTER/health"      # 必须看到 {"router":"ok","lmstudio":"ok"}
    ```
