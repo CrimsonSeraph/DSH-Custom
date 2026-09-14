@@ -38,9 +38,37 @@ curl / 任意客户端   ─┘        （自动切换模型）           （真
 | `minicpm-v-2_6` | 7.6B / Q8_0 | 8.51GB | 高质量 OCR、文档/表格理解，目前最可靠的默认选择 |
 | `qwen2.5-vl-7b-instruct` | 7B / Q4_K_M | 5.62GB | 通用视觉理解、UI 元素语义、空间推理；上下文 128k |
 | `text-embedding-nomic-embed-text-v1.5` | — / Q4_K_M | 84MB | 嵌入模型（非对话模型，router 不用于识图） |
+| `qwen2.5-coder-14b-instruct` | 14B / Q4_K_M | ~9GB | **常态默认**：可完整加载到 12GB 显存，速度 ~20-30 tok/s |
+| `qwen3-coder-30b` | 30B MoE / Q4_K_M | ~18GB | 质量更高，需要 CPU Offload，速度 ~9-22 tok/s |
 
 三个视觉模型都声明了 `vision: true`。一次只能加载一个（显存限制）；
 切换实测约 7–10 秒/次，所以同一轮任务应固定用一个模型。
+
+`model` 字段支持以下别名：
+
+| 别名                                            | 解析为                    |
+| ----------------------------------------------- | ------------------------- |
+| `coder` / `code` / `default-coder`              | `LMSTUDIO_CODER_MODEL`    |
+| `coder-deep` / `coder-long` / `deep-coder`      | `LMSTUDIO_CODER_DEEP_MODEL` |
+| `auto` / `vision` / `default`                   | `LMSTUDIO_VISION_MODEL`   |
+
+**注意**：一次只加载一个模型（显存限制）。编码模型和视觉模型之间切换实测 7-10 秒。
+不要在同一轮任务里交叉使用编码和识图。
+
+### 选型建议
+
+- 日常编程、代码审查、生成测试、样板代码 → `qwen2.5-coder-14b-instruct`
+- 复杂算法、跨文件重构、用户声明"不限时长" → `qwen3-coder-30b`
+- 识图 → 见「可用模型」一节
+
+### 加载 30B 模型的注意事项
+
+`qwen3-coder-30b` 的 Q4_K_M 权重约 18GB，无法完全装入 12GB 显存。
+需要在 LM Studio 的模型加载配置里手动设置 **GPU Offload Layers**（建议 25-35），
+让部分层走 CPU。首次加载会慢 30 秒以上，后续推理速度会明显低于 14B 模型。
+
+router 的 `load_model()` 只发送 `{"model": <key>}`，加载配置由 LM Studio 按模型名记忆。
+请在 LM Studio 界面里先手动加载一次 30B 模型、调好 GPU 层数、确认可用，再交给 router。
 
 ### 选型建议
 
@@ -84,6 +112,8 @@ start /b python lmstudio_router.py serve
 | `LMSTUDIO_RETRY_MODEL` | 空正文兜底时改用的模型；留空等于关闭 | `minicpm-v-2_6` |
 | `LMSTUDIO_LOAD_TIMEOUT` | 加载模型超时秒数 | `300` |
 | `LMSTUDIO_REQUEST_TIMEOUT` | 转发请求超时秒数 | `600` |
+| `LMSTUDIO_CODER_MODEL` | `model="coder"` 时使用的代码模型 | `qwen2.5-coder-14b-instruct` |
+| `LMSTUDIO_CODER_DEEP_MODEL` | `model="coder-deep"` 时使用的代码模型 | `qwen3-coder-30b` |
 
 ## 调用方式
 

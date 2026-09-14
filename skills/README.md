@@ -33,6 +33,7 @@ whenToUse: <何时该用这个 skill>   # 可选；触发场景
 | --- | --- |
 | `qt-screenshot/` | 给 Qt/QML 应用启动真实窗口并按窗口句柄截图（视觉检查、多尺寸回归、排查窗口出不来 / 截图为空白 / 脚本卡死） |
 | `local-vision/` | 看图默认走本机 LM Studio 视觉模型（经 `custom/tools/LMStudio/` 的 router 代理按 `model` 字段自动切换），避免 DSH 原生读图的高 token 开销；含模型选型、切换/卸载、降级顺序与故障排查 |
+| `local-coding/` | 编程任务优先走本地 LM Studio 代码模型（默认 Qwen2.5-Coder-14B，用户声明"不限时长"时用 Qwen3-Coder-30B），主模型只负责提供需求与审查结果，避免把整段代码塞进主模型上下文 |
 
 ## 如何将 skill 接入 DSH
 
