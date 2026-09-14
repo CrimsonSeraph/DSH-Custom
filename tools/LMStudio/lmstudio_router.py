@@ -16,8 +16,9 @@
 ``LMSTUDIO_ROUTER_PORT``     本代理监听端口                                ``1235``
 ``LMSTUDIO_ROUTER_HOST``     本代理监听地址                                ``127.0.0.1``
 ``LMSTUDIO_VISION_MODEL``    ``model="auto"`` 时使用的视觉模型              ``qwen2.5-vl-7b-instruct``
-``LMSTUDIO_CODER_MODEL``     ``model="coder"`` 时使用的代码模型          ``qwen2.5-coder-14b-instruct``
-``LMSTUDIO_CODER_DEEP_MODEL`` ``model="coder-deep"`` 时使用的代码模型     ``qwen3-coder-30b-a3b-instruct``
+``LMSTUDIO_CODER_MODEL``      ``model="coder"`` 时的主力代码模型      ``qwen3-coder-30b-a3b-instruct``
+``LMSTUDIO_CODER_FAST_MODEL`` ``model="coder-fast"`` 时的轻量备用     ``qwen2.5-coder-14b-instruct``
+``LMSTUDIO_CODER_DEEP_MODEL`` ``model="coder-deep"`` 时的质量档（Q6） ``qwen3-coder-30b-a3b-instruct@q6_k``
 ``LMSTUDIO_RETRY_ON_EMPTY``  空正文兜底重试开关（``0`` 关闭）                ``1``
 ``LMSTUDIO_RETRY_MODEL``     空正文时改用的模型；留空等于关闭               ``minicpm-v-2_6``
 ``LMSTUDIO_LOAD_TIMEOUT``    加载模型的超时秒数                            ``300``
@@ -60,10 +61,16 @@ LM_STUDIO_BASE = os.environ.get("LMSTUDIO_BASE", "http://localhost:1234").rstrip
 PROXY_HOST = os.environ.get("LMSTUDIO_ROUTER_HOST", "127.0.0.1")
 PROXY_PORT = int(os.environ.get("LMSTUDIO_ROUTER_PORT", "1235"))
 VISION_MODEL = os.environ.get("LMSTUDIO_VISION_MODEL", "qwen2.5-vl-7b-instruct")
-# 代码模型
-CODER_MODEL = os.environ.get("LMSTUDIO_CODER_MODEL", "qwen2.5-coder-14b-instruct")
+# 代码模型三档
+# coder（默认主力）：30B MoE Q4_K_M，激活仅 3.3B，CPU Offload 下速度接近 14B
+CODER_MODEL = os.environ.get("LMSTUDIO_CODER_MODEL", "qwen3-coder-30b-a3b-instruct")
+# coder-fast：显存紧张或需要给视觉模型腾地方时用
+CODER_FAST_MODEL = os.environ.get(
+    "LMSTUDIO_CODER_FAST_MODEL", "qwen2.5-coder-14b-instruct"
+)
+# coder-deep：质量优先档，Q6 量化。⚠️ key 必须用 `models` 子命令核对后的真实值
 CODER_DEEP_MODEL = os.environ.get(
-    "LMSTUDIO_CODER_DEEP_MODEL", "qwen3-coder-30b-a3b-instruct"
+    "LMSTUDIO_CODER_DEEP_MODEL", "qwen3-coder-30b-a3b-instruct@q6_k"
 )
 # 空正文兜底：换 RETRY_MODEL 重试一次（设为空字符串或 LMSTUDIO_RETRY_ON_EMPTY=0 可关闭）
 RETRY_ON_EMPTY = os.environ.get("LMSTUDIO_RETRY_ON_EMPTY", "1").strip().lower() not in {
@@ -201,47 +208,78 @@ def unload_model(instance_id: str, base: str = LM_STUDIO_BASE) -> None:
         )
 
 
-def ensure_model(requested_model: str, base: str = LM_STUDIO_BASE) -> Dict[str, Any]:
-    """确保 ``requested_model`` 已加载：已加载则空转，否则卸载占用者再加载。
+def ensure_model(
+    requested_model: str,
+    base: str = LM_STUDIO_BASE,
+    fallbacks: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """确保模型已加载。目标不可用（未下载 / 加载失败）时按 fallbacks 顺序尝试。
 
-    返回一份描述本次动作的摘要，便于代理把它透出给调用方。
+    返回动作摘要；fallback_used=True 时说明发生了降级。
     """
+    candidates = [requested_model] + list(fallbacks or [])
+
     models = list_models(base)
     loaded = loaded_instances(models)
     loaded_models = {item["model"] for item in loaded}
+    available = [m.get("key") for m in models if m.get("type") == "llm"]
 
+    # 快速路径：请求的模型已加载
     if requested_model in loaded_models:
         return {"action": "none", "model": requested_model, "unloaded": []}
 
-    available = [m.get("key") for m in models if m.get("type") == "llm"]
-    if requested_model not in available:
-        raise LMStudioError(
-            f"unknown model '{requested_model}'; available: {', '.join(str(k) for k in available)}",
-            status=404,
-        )
+    errors: List[str] = []
+    for cand in candidates:
+        if cand not in available:
+            errors.append(f"{cand}: 未下载")
+            continue
+        if cand in loaded_models:
+            return {
+                "action": "none",
+                "model": cand,
+                "requested": requested_model,
+                "fallback_used": cand != requested_model,
+                "unloaded": [],
+            }
 
-    unloaded: List[str] = []
-    for item in loaded:
+        # 卸载占用者
+        unloaded: List[str] = []
         try:
-            unload_model(item["instance_id"], base)
-            unloaded.append(item["model"])
+            for item in loaded:
+                unload_model(item["instance_id"], base)
+                unloaded.append(item["model"])
         except LMStudioError as error:
-            raise LMStudioError(
-                f"failed to free model '{item['model']}': {error}"
-            ) from error
+            errors.append(f"{cand}: 卸载旧模型失败 ({error})")
+            continue
 
-    result = load_model(requested_model, base)
-    return {
-        "action": "switched" if unloaded else "loaded",
-        "model": requested_model,
-        "unloaded": unloaded,
-        "load_time_seconds": result.get("load_time_seconds"),
-        "instance_id": result.get("instance_id"),
-    }
+        # 尝试加载
+        try:
+            result = load_model(cand, base)
+        except LMStudioError as error:
+            errors.append(f"{cand}: 加载失败 ({error})")
+            # 加载失败时已卸载的旧模型已丢，继续循环尝试下一个候选
+            continue
+
+        return {
+            "action": "switched" if unloaded else "loaded",
+            "model": cand,
+            "requested": requested_model,
+            "fallback_used": cand != requested_model,
+            "unloaded": unloaded,
+            "load_time_seconds": result.get("load_time_seconds"),
+            "instance_id": result.get("instance_id"),
+        }
+
+    raise LMStudioError(
+        f"候选模型全部不可用：{', '.join(candidates)}；"
+        f"明细：{'; '.join(errors)}；"
+        f"当前已下载：{', '.join(str(k) for k in available) or '无'}",
+        status=503,
+    )
 
 
 def resolve_model(requested: Optional[str]) -> Optional[str]:
-    """把 ``auto`` / ``vision`` / ``coder`` / ``coder-deep`` 之类的别名解析成真实模型 ID。"""
+    """把别名解析成真实模型 ID。"""
     if requested is None:
         return None
     key = requested.strip().lower()
@@ -249,9 +287,20 @@ def resolve_model(requested: Optional[str]) -> Optional[str]:
         return VISION_MODEL
     if key in {"coder", "code", "default-coder"}:
         return CODER_MODEL
+    if key in {"coder-fast", "fast-coder", "coder-lite", "coder-14b"}:
+        return CODER_FAST_MODEL
     if key in {"coder-deep", "coder-long", "deep-coder", "code-deep"}:
         return CODER_DEEP_MODEL
     return requested
+
+
+def _fallbacks_for(model_name: str) -> List[str]:
+    """给指定模型返回降级候选链（不含自身）。本地模型不可用时按顺序尝试。"""
+    if model_name == CODER_DEEP_MODEL:
+        return [CODER_MODEL, CODER_FAST_MODEL]
+    if model_name == CODER_MODEL:
+        return [CODER_FAST_MODEL]
+    return []
 
 
 # --------------------------------------------------------------------------
@@ -292,6 +341,7 @@ def build_app():  # noqa: ANN201 - 延迟导入，未装 fastapi 时子命令仍
             "port": PROXY_PORT,
             "vision_default": VISION_MODEL,
             "coder_default": CODER_MODEL,
+            "coder_fast_default": CODER_FAST_MODEL,
             "coder_deep_default": CODER_DEEP_MODEL,
             "loaded": loaded,
         }
@@ -308,6 +358,7 @@ def build_app():  # noqa: ANN201 - 延迟导入，未装 fastapi 时子命令仍
             "port": PROXY_PORT,
             "vision_default": VISION_MODEL,
             "coder_default": CODER_MODEL,
+            "coder_fast_default": CODER_FAST_MODEL,
             "coder_deep_default": CODER_DEEP_MODEL,
             "models": [
                 {
@@ -391,7 +442,7 @@ def build_app():  # noqa: ANN201 - 延迟导入，未装 fastapi 时子命令仍
 
         try:
             with _SWITCH_LOCK:
-                switch = ensure_model(requested)
+                switch = ensure_model(requested, fallbacks=_fallbacks_for(requested))
         except LMStudioError as error:
             raise _upstream_error(error) from error
 
@@ -412,20 +463,36 @@ def build_app():  # noqa: ANN201 - 延迟导入，未装 fastapi 时子命令仍
             raise HTTPException(status_code=upstream.status_code, detail=detail)
 
         if switch.get("action") != "none":
-            print(
-                f"[router] {switch['action']} '{requested}'"
-                + (
-                    f" (unloaded {', '.join(switch['unloaded'])})"
-                    if switch.get("unloaded")
-                    else ""
+            if switch.get("fallback_used"):
+                print(
+                    f"[router] FALLBACK '{switch.get('requested')}' -> '{switch['model']}'"
+                    + (
+                        f" (unloaded {', '.join(switch['unloaded'])})"
+                        if switch.get("unloaded")
+                        else ""
+                    )
+                    + (
+                        f" in {switch['load_time_seconds']}s"
+                        if switch.get("load_time_seconds")
+                        else ""
+                    ),
+                    flush=True,
                 )
-                + (
-                    f" in {switch['load_time_seconds']}s"
-                    if switch.get("load_time_seconds")
-                    else ""
-                ),
-                flush=True,
-            )
+            else:
+                print(
+                    f"[router] {switch['action']} '{requested}'"
+                    + (
+                        f" (unloaded {', '.join(switch['unloaded'])})"
+                        if switch.get("unloaded")
+                        else ""
+                    )
+                    + (
+                        f" in {switch['load_time_seconds']}s"
+                        if switch.get("load_time_seconds")
+                        else ""
+                    ),
+                    flush=True,
+                )
 
         media_type = upstream.headers.get("content-type", "application/json")
 
@@ -619,6 +686,7 @@ def cmd_status(_args: argparse.Namespace) -> int:
         print("  loaded: none")
     print(f"vision default : {VISION_MODEL} (LMSTUDIO_VISION_MODEL)")
     print(f"coder default  : {CODER_MODEL} (LMSTUDIO_CODER_MODEL)")
+    print(f"coder-fast     : {CODER_FAST_MODEL} (LMSTUDIO_CODER_FAST_MODEL)")
     print(f"coder-deep     : {CODER_DEEP_MODEL} (LMSTUDIO_CODER_DEEP_MODEL)")
     return 0
 
