@@ -16,6 +16,8 @@
 ``LMSTUDIO_ROUTER_PORT``     本代理监听端口                                ``1235``
 ``LMSTUDIO_ROUTER_HOST``     本代理监听地址                                ``127.0.0.1``
 ``LMSTUDIO_VISION_MODEL``    ``model="auto"`` 时使用的视觉模型              ``qwen2.5-vl-7b-instruct``
+``LMSTUDIO_CODER_MODEL``     ``model="coder"`` 时使用的代码模型          ``qwen2.5-coder-14b-instruct``
+``LMSTUDIO_CODER_DEEP_MODEL`` ``model="coder-deep"`` 时使用的代码模型     ``qwen3-coder-30b-a3b-instruct``
 ``LMSTUDIO_RETRY_ON_EMPTY``  空正文兜底重试开关（``0`` 关闭）                ``1``
 ``LMSTUDIO_RETRY_MODEL``     空正文时改用的模型；留空等于关闭               ``minicpm-v-2_6``
 ``LMSTUDIO_LOAD_TIMEOUT``    加载模型的超时秒数                            ``300``
@@ -53,10 +55,16 @@ from typing import Any, Dict, List, Optional, Tuple
 # 延迟注解会让 FastAPI 无法解析局部导入的 Request/依赖类型，把请求体当成查询参数（422）。
 
 # --- 配置区（全部可被环境变量覆盖）---
+# 视觉模型
 LM_STUDIO_BASE = os.environ.get("LMSTUDIO_BASE", "http://localhost:1234").rstrip("/")
 PROXY_HOST = os.environ.get("LMSTUDIO_ROUTER_HOST", "127.0.0.1")
 PROXY_PORT = int(os.environ.get("LMSTUDIO_ROUTER_PORT", "1235"))
 VISION_MODEL = os.environ.get("LMSTUDIO_VISION_MODEL", "qwen2.5-vl-7b-instruct")
+# 代码模型
+CODER_MODEL = os.environ.get("LMSTUDIO_CODER_MODEL", "qwen2.5-coder-14b-instruct")
+CODER_DEEP_MODEL = os.environ.get(
+    "LMSTUDIO_CODER_DEEP_MODEL", "qwen3-coder-30b-a3b-instruct"
+)
 # 空正文兜底：换 RETRY_MODEL 重试一次（设为空字符串或 LMSTUDIO_RETRY_ON_EMPTY=0 可关闭）
 RETRY_ON_EMPTY = os.environ.get("LMSTUDIO_RETRY_ON_EMPTY", "1").strip().lower() not in {
     "0",
@@ -233,11 +241,16 @@ def ensure_model(requested_model: str, base: str = LM_STUDIO_BASE) -> Dict[str, 
 
 
 def resolve_model(requested: Optional[str]) -> Optional[str]:
-    """把 ``auto`` / ``vision`` 之类的别名解析成真实模型 ID。"""
+    """把 ``auto`` / ``vision`` / ``coder`` / ``coder-deep`` 之类的别名解析成真实模型 ID。"""
     if requested is None:
         return None
-    if requested.strip().lower() in {"auto", "vision", "default"}:
+    key = requested.strip().lower()
+    if key in {"auto", "vision", "default"}:
         return VISION_MODEL
+    if key in {"coder", "code", "default-coder"}:
+        return CODER_MODEL
+    if key in {"coder-deep", "coder-long", "deep-coder", "code-deep"}:
+        return CODER_DEEP_MODEL
     return requested
 
 
@@ -278,6 +291,8 @@ def build_app():  # noqa: ANN201 - 延迟导入，未装 fastapi 时子命令仍
             "base": LM_STUDIO_BASE,
             "port": PROXY_PORT,
             "vision_default": VISION_MODEL,
+            "coder_default": CODER_MODEL,
+            "coder_deep_default": CODER_DEEP_MODEL,
             "loaded": loaded,
         }
 
