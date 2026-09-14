@@ -307,6 +307,8 @@ def build_app():  # noqa: ANN201 - 延迟导入，未装 fastapi 时子命令仍
             "base": LM_STUDIO_BASE,
             "port": PROXY_PORT,
             "vision_default": VISION_MODEL,
+            "coder_default": CODER_MODEL,
+            "coder_deep_default": CODER_DEEP_MODEL,
             "models": [
                 {
                     "key": model.get("key"),
@@ -525,7 +527,8 @@ def run_server(host: str = PROXY_HOST, port: int = PROXY_PORT) -> int:
         )
 
     print(
-        f"[router] listening on http://{host}:{port}  (vision default: {VISION_MODEL})"
+        f"[router] listening on http://{host}:{port}  "
+        f"(vision: {VISION_MODEL}, coder: {CODER_MODEL}, coder-deep: {CODER_DEEP_MODEL})"
     )
     uvicorn.run(app, host=host, port=port, log_level="info")
     return 0
@@ -615,6 +618,8 @@ def cmd_status(_args: argparse.Namespace) -> int:
     if not loaded:
         print("  loaded: none")
     print(f"vision default : {VISION_MODEL} (LMSTUDIO_VISION_MODEL)")
+    print(f"coder default  : {CODER_MODEL} (LMSTUDIO_CODER_MODEL)")
+    print(f"coder-deep     : {CODER_DEEP_MODEL} (LMSTUDIO_CODER_DEEP_MODEL)")
     return 0
 
 
@@ -756,6 +761,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     load = sub.add_parser("load", help="加载模型（必要时先卸载占用者）")
     load.add_argument("model", help="模型 key，或 auto/vision 使用默认视觉模型")
+    load.add_argument(
+        "model", help="模型 key，或 auto/vision/coder/coder-deep 使用预设别名"
+    )
 
     unload = sub.add_parser("unload", help="卸载模型")
     unload.add_argument("model", nargs="?", help="模型 key；省略时需加 --all")
@@ -772,6 +780,11 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("--max-tokens", type=int, default=512)
     ask.add_argument("--temperature", type=float, default=0.1)
     ask.add_argument("--json", action="store_true", help="输出原始 JSON")
+    ask.add_argument(
+        "--model",
+        default="auto",
+        help="模型 key，默认 auto（用 LMSTUDIO_VISION_MODEL）",
+    )
 
     return parser
 

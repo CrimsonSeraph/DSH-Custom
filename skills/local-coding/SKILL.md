@@ -118,3 +118,4 @@ python "$TOOLS/lmstudio_router.py" unload --all         # 释放显存
 - ❌ 在同一轮任务里混用 coder 和 vision（每次切换 7-10 秒）
 - ❌ 用户没说"不限时长"就用 `coder-deep`（速度慢，影响体验）
 - ❌ 让本地模型直接对用户输出最终答案——本地模型的输出必须经过你（主模型）的审查
+- ❌ 不要同一轮任务内不要并发请求本地 coder 模型
