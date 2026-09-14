@@ -760,7 +760,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     load = sub.add_parser("load", help="加载模型（必要时先卸载占用者）")
-    load.add_argument("model", help="模型 key，或 auto/vision 使用默认视觉模型")
     load.add_argument(
         "model", help="模型 key，或 auto/vision/coder/coder-deep 使用预设别名"
     )
@@ -780,11 +779,6 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("--max-tokens", type=int, default=512)
     ask.add_argument("--temperature", type=float, default=0.1)
     ask.add_argument("--json", action="store_true", help="输出原始 JSON")
-    ask.add_argument(
-        "--model",
-        default="auto",
-        help="模型 key，默认 auto（用 LMSTUDIO_VISION_MODEL）",
-    )
 
     return parser
 
