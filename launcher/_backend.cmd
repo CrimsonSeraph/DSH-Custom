@@ -122,6 +122,13 @@ if not exist "%APP_DIR%\.git\hooks\pre-commit" (
   echo [hook] git hooks 已安装，跳过。
 )
 
+rem [skills] 把项目内的技能目录链接到 %USERPROFILE%\.dsh\skills
+echo [skills] 同步技能目录到 %USERPROFILE%\.dsh\skills ...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0link-skills.ps1" "%APP_DIR%"
+if errorlevel 1 (
+  echo [WARN] 技能目录同步失败，继续启动。请查看上方日志。
+)
+
 rem [4/4] 启动 Web 服务
 echo [4/4] 启动 Web 服务 (按 Ctrl+C 或关闭本窗口即停止服务)...
 if defined DSH_NO_BROWSER (
