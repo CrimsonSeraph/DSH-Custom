@@ -1,9 +1,9 @@
 # link-skills.ps1
-# 把 <AppDir>\.agents\skills 与 <AppDir>\custom\skills 下的每个技能子目录
-# 以 Junction 形式链接到 <User>\.dsh\skills\ 下。
-# - 使用 Junction（不需要管理员权限，仅限本地卷）。
-# - 已存在的正确链接会跳过；指向别处的链接会被刷新；
-#   同名真实目录不会被覆盖，仅输出警告。
+# Symlink each skill folder under <AppDir>\.agents\skills and <AppDir>\custom\skills
+# into <UserProfile>\.dsh\skills as a Junction.
+# - Junctions do not require admin rights (local volumes only).
+# - Existing correct links are skipped; links pointing elsewhere are refreshed;
+#   real (non-link) directories with the same name are left untouched (warning).
 param(
   [Parameter(Mandatory = $true)]
   [string]$AppDir
@@ -19,7 +19,7 @@ $targetRoot = Join-Path $userProfile '.dsh\skills'
 
 if (-not (Test-Path -LiteralPath $targetRoot)) {
   New-Item -ItemType Directory -Path $targetRoot -Force | Out-Null
-  Write-Host "[skills] 已创建目录: $targetRoot"
+  Write-Host "[skills] Created: $targetRoot"
 }
 
 $sourceDirs = @(
@@ -40,7 +40,7 @@ $conflicts = 0
 
 foreach ($src in $sourceDirs) {
   if (-not (Test-Path -LiteralPath $src -PathType Container)) {
-    Write-Host "[skills] 跳过（源目录不存在）: $src"
+    Write-Host "[skills] Skip (source missing): $src"
     continue
   }
 
@@ -54,7 +54,7 @@ foreach ($src in $sourceDirs) {
       $isLink = [bool]($existing.Attributes -band [System.IO.FileAttributes]::ReparsePoint)
 
       if (-not $isLink) {
-        Write-Host "[skills] 冲突（同名实体已存在，非链接，跳过）: $linkPath"
+        Write-Host "[skills] Conflict (real dir exists, skipping): $linkPath"
         $script:conflicts++
         return
       }
@@ -67,18 +67,19 @@ foreach ($src in $sourceDirs) {
       } catch { }
 
       if ($existingTarget -and ($existingTarget -ieq $skillSrc)) {
-        return  # 已正确链接
+        return  # already linked correctly
       }
 
-      # 注意：不要用 Remove-Item -Recurse，PS 5.1 会跟着 junction 删掉源内容。
-      Write-Host "[skills] 刷新链接: $skillName"
+      # Do NOT use Remove-Item -Recurse here: PS 5.1 would follow the junction
+      # and delete the actual source content.
+      Write-Host "[skills] Refreshing link: $skillName"
       [System.IO.Directory]::Delete($linkPath, $false)
     }
 
     New-Item -ItemType Junction -Path $linkPath -Target $skillSrc | Out-Null
-    Write-Host "[skills] 已链接: $skillName -> $skillSrc"
+    Write-Host "[skills] Linked: $skillName -> $skillSrc"
     $script:created++
   }
 }
 
-Write-Host "[skills] 完成（新建/刷新 $created，冲突 $conflicts）。"
+Write-Host "[skills] Done (created/refreshed: $created, conflicts: $conflicts)."
