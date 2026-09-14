@@ -38,12 +38,12 @@ whenToUse: 写代码、解释代码、审查代码、生成测试/样板、格�
 
 ## 模型
 
-| 别名                          | 实际模型                              | 场景            |
-| ----------------------------- | ------------------------------------- | --------------- | -------------------------------------------------------------------- |
-| `coder`（默认）               | qwen3-coder-30b-a3b-instruct          | ~18GB / Q4_K_M  | **常态主力**，CPU Offload 下 ~27 tok/s                               |
-| `coder-fast`                  | qwen2.5-coder-14b-instruct            | ~9GB / Q4_K_M   | 显存紧张 / 给视觉腾地方 / 极简任务                                   |
-| `coder-deep`                  | qwen3-coder-30b-a3b-instruct **@ Q6** | ~24GB / Q6_K    | 质量优先，用户声明"不限时长"时用；CPU Offload 更重，速度可能明显更慢 |
-| `auto` / `vision` / `default` | qwen2.5-vl-7b-instruct                | ~5.6GB / Q4_K_M | 视觉模型（见 `local-vision` skill）                                  |
+| 别名                          | 实际模型                     | 大小 / 量化     | 场景                             |
+| ----------------------------- | ---------------------------- | --------------- | -------------------------------- |
+| `coder`（默认）               | `qwen3-coder-30b`            | 17.35G / Q4_K_M | **常态主力**                     |
+| `coder-fast`                  | `qwen2.5-coder-14b-instruct` | 8.37G / Q4_K_M  | 显存紧张 / 给视觉腾地方          |
+| `coder-deep`                  | `qwen/qwen3-coder-30b`       | 23.38G / Q6_K   | 质量优先，用户声明"不限时长"时用 |
+| `auto` / `vision` / `default` | `qwen2.5-vl-7b-instruct`     | 5.62G / Q4_K_M  | 视觉（见 `local-vision` skill）  |
 
 **一次只加载一个模型**（显存限制）。同一轮任务固定用一个模型——切换一次 7-10 秒。
 

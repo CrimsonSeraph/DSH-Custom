@@ -16,9 +16,9 @@
 ``LMSTUDIO_ROUTER_PORT``     本代理监听端口                                ``1235``
 ``LMSTUDIO_ROUTER_HOST``     本代理监听地址                                ``127.0.0.1``
 ``LMSTUDIO_VISION_MODEL``    ``model="auto"`` 时使用的视觉模型              ``qwen2.5-vl-7b-instruct``
-``LMSTUDIO_CODER_MODEL``      ``model="coder"`` 时的主力代码模型      ``qwen3-coder-30b-a3b-instruct``
-``LMSTUDIO_CODER_FAST_MODEL`` ``model="coder-fast"`` 时的轻量备用     ``qwen2.5-coder-14b-instruct``
-``LMSTUDIO_CODER_DEEP_MODEL`` ``model="coder-deep"`` 时的质量档（Q6） ``qwen3-coder-30b-a3b-instruct@q6_k``
+``LMSTUDIO_CODER_MODEL``      ``model="coder"`` 时的主力代码模型         ``qwen3-coder-30b`` (Q4_K_M)
+``LMSTUDIO_CODER_FAST_MODEL`` ``model="coder-fast"`` 时的轻量备用        ``qwen2.5-coder-14b-instruct``
+``LMSTUDIO_CODER_DEEP_MODEL`` ``model="coder-deep"`` 时的质量档          ``qwen/qwen3-coder-30b`` (Q6_K)
 ``LMSTUDIO_RETRY_ON_EMPTY``  空正文兜底重试开关（``0`` 关闭）                ``1``
 ``LMSTUDIO_RETRY_MODEL``     空正文时改用的模型；留空等于关闭               ``minicpm-v-2_6``
 ``LMSTUDIO_LOAD_TIMEOUT``    加载模型的超时秒数                            ``300``
@@ -63,15 +63,13 @@ PROXY_PORT = int(os.environ.get("LMSTUDIO_ROUTER_PORT", "1235"))
 VISION_MODEL = os.environ.get("LMSTUDIO_VISION_MODEL", "qwen2.5-vl-7b-instruct")
 # 代码模型三档
 # coder（默认主力）：30B MoE Q4_K_M，激活仅 3.3B，CPU Offload 下速度接近 14B
-CODER_MODEL = os.environ.get("LMSTUDIO_CODER_MODEL", "qwen3-coder-30b-a3b-instruct")
+CODER_MODEL = os.environ.get("LMSTUDIO_CODER_MODEL", "qwen3-coder-30b")
 # coder-fast：显存紧张或需要给视觉模型腾地方时用
 CODER_FAST_MODEL = os.environ.get(
     "LMSTUDIO_CODER_FAST_MODEL", "qwen2.5-coder-14b-instruct"
 )
 # coder-deep：质量优先档，Q6 量化。⚠️ key 必须用 `models` 子命令核对后的真实值
-CODER_DEEP_MODEL = os.environ.get(
-    "LMSTUDIO_CODER_DEEP_MODEL", "qwen3-coder-30b-a3b-instruct@q6_k"
-)
+CODER_DEEP_MODEL = os.environ.get("LMSTUDIO_CODER_DEEP_MODEL", "qwen/qwen3-coder-30b")
 # 空正文兜底：换 RETRY_MODEL 重试一次（设为空字符串或 LMSTUDIO_RETRY_ON_EMPTY=0 可关闭）
 RETRY_ON_EMPTY = os.environ.get("LMSTUDIO_RETRY_ON_EMPTY", "1").strip().lower() not in {
     "0",
