@@ -32,8 +32,6 @@ whenToUse: <何时该用这个 skill>   # 可选；触发场景
 | skill | 用途 |
 | --- | --- |
 | `qt-screenshot/` | 给 Qt/QML 应用启动真实窗口并按窗口句柄截图（视觉检查、多尺寸回归、排查窗口出不来 / 截图为空白 / 脚本卡死） |
-| `local-vision/` | 看图默认走本机 LM Studio 视觉模型（经 `custom/tools/LMStudio/` 的 router 代理按 `model` 字段自动切换），避免 DSH 原生读图的高 token 开销；含模型选型、切换/卸载、降级顺序与故障排查 |
-| `local-coding/` | 编程任务优先走本地 LM Studio 代码模型（默认 Qwen2.5-Coder-14B，用户声明"不限时长"时用 Qwen3-Coder-30B），主模型只负责提供需求与审查结果，避免把整段代码塞进主模型上下文 |
 
 ## 如何将 skill 接入 DSH
 
@@ -47,12 +45,28 @@ whenToUse: <何时该用这个 skill>   # 可选；触发场景
 | 400 | `user-dsh` | `$DSH_HOME/skills`（默认 `~/.dsh/skills`） |
 | 500 | `user-agents` | `$DSH_AGENTS_HOME/skills`（默认 `~/.agents/skills`） |
 
-`custom/skills/` 不在上面任何一行里，因此需要下面三种方式之一把它接进去。
+`custom/skills/` 不在上面任何一行里，因此需要下面几种方式之一把它接进去。
 
-### 方式一：在设置面板添加目录（推荐）
+### 方式一：由启动脚本自动联接（推荐，已内置）
 
-在 DSH Web UI 的**设置 → Agent Skills（技能）**面板里点击「添加目录 / Add directory」，
-选中本目录（`<仓库根>/custom/skills`）作为技能提供者目录。
+`custom/launcher/` 下的启动脚本在拉起 DSH 之前，会自动把仓库里两个技能根目录
+下的**所有 skill 文件夹**联接（目录联接 / symlink）到用户级扫描根
+`<User>\.dsh\skills`（即 `$DSH_HOME/skills`）：
+
+- `deepseek-harness\.agents\skills\*`
+- `deepseek-harness\custom\skills\*`
+
+也就是说，只要通过启动脚本进入 DSH，`custom/skills/` 下的 skill 就已经出现在
+rank 400 的扫描根里，**无需手动配置 `customSkillDirs`，也无需手工复制目录**。
+新增一个 skill 目录后，重新运行一次启动脚本即可建立联接。
+
+> Windows 上创建目录联接需要相应权限（或开发者模式）；若脚本报联接失败，
+> 请以具备权限的账户运行，或退回方式二手工建立 `mklink /J`。
+
+### 方式二：在设置面板添加目录
+
+若不想依赖启动脚本，可在 DSH Web UI 的**设置 → Agent Skills（技能）**面板里点击
+「添加目录 / Add directory」，选中本目录（`<仓库根>/custom/skills`）作为技能提供者目录。
 
 该入口在部分构建里表现为「配置额外的 skill 根目录」，它最终写入的就是提供方
 `@deepseek-ai/dsh-skill-filesystem` 的 `customSkillDirs`。如果当前版本的面板没有这个入口，
@@ -70,9 +84,10 @@ whenToUse: <何时该用这个 skill>   # 可选；触发场景
 # --- end skills-custom ---
 ```
 
-### 方式二：复制或链接到默认扫描根
+### 方式三：手工复制或链接到默认扫描根
 
-把 skill 目录放进 `$DSH_HOME/skills`（默认 `~/.dsh/skills`）或 `~/.agents/skills`：
+如果既不走启动脚本、也不想改配置，可以手动把 skill 目录放进
+`$DSH_HOME/skills`（默认 `~/.dsh/skills`）或 `~/.agents/skills`：
 
 ```bash
 # 复制一份（改动不会自动同步回仓库）
@@ -86,7 +101,7 @@ ln -s <仓库根>/custom/skills/qt-screenshot "$HOME/.dsh/skills/qt-screenshot"
 `custom/tools/` 脚本，若只复制了 skill，请一并复制工具目录，或设置环境变量
 `QT_SHOT_TOOLS` 指向工具实际所在位置。
 
-### 方式三：通过插件安装
+### 方式四：通过插件安装
 
 如果使用技能管理类插件（例如 `dsh-plug-skills` 之类的面板插件），
 可在插件面板中「安装 / 导入」本地技能目录，插件会把技能目录复制进
@@ -96,7 +111,7 @@ ln -s <仓库根>/custom/skills/qt-screenshot "$HOME/.dsh/skills/qt-screenshot"
 ### 生效与验证
 
 - 技能目录被监听：新增 skill 目录、修改已有 `SKILL.md` 会触发重新发现。
-- 复制整个目录到新的根目录、或改动 `customSkillDirs` 配置后，
-  配置变更需要**重启 DSH**；仅内容变化通常刷新会话（新建会话）即可。
+- 通过启动脚本新建/更新联接、复制整个目录到新的根目录、或改动 `customSkillDirs`
+  配置后，配置变更需要**重启 DSH**；仅内容变化通常刷新会话（新建会话）即可。
 - 验证：新建一个会话，看会话开头的可用技能列表里是否出现 `qt-screenshot`；
   或直接让 agent「列出可用 skill」。DSH 日志里也会有解析告警，便于排查 frontmatter 写错的情况。
