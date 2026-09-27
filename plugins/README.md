@@ -1,7 +1,7 @@
 # 本地已安装第三方插件清单（custom/plugins）
 
 本目录记录本机在 DSH Web 运行环境中安装的**非上游（第三方）插件**清单及其安装方式，
-供重装、迁移、审计参考。快照时间：2026-09-23；上游仓库自带插件（`@deepseek-ai/dsh-*`）不在此列。
+供重装、迁移、审计参考。快照时间：2026-09-27；上游仓库自带插件（`@deepseek-ai/dsh-*`）不在此列。
 数据来自用户 web profile（`%USERPROFILE%\.dsh\profiles\web`），本文不含任何用户私人数据。
 
 ---
@@ -241,3 +241,103 @@ cannot resolve profile bundle "<包名>" from the dsh installation or <profile �
 3. SSH 密码以明文存放于用户主目录私有文件，传输/执行消耗真实远程资源，操作前先确认；
 4. **DSH 依赖用 pnpm 管理，不要用 `npm update`**——npm 的 peer 解析会因 DSH 官方包内部的版本跨度（如 `@deepseek-ai/dsh-settings@0.0.1-rc.1` 要求 `dsh-invariants@^0.0.1-rc.1`，而实际装的是 `0.1.2-rc.1`）而报 `ERESOLVE`，这是正常现象，用 `dsh plugin --profile web update` 即可；
 5. `.credentials.yaml` 的 `version` 与 `refs` 字段在新版 DSH 中要求**字符串类型**，手工编辑时注意加引号，且尽量避免手动编辑该文件，优先用 DSH 自身的凭据管理命令。
+
+---
+
+## 八、如何彻底清除环境并重装恢复（保留会话历史）
+
+当 DSH 发生**破坏性变更**（如底层设置 API 重构导致旧插件报 `settings service is absent`），或本地因频繁升级导致依赖树严重污染时，常规的“卸载重装”往往无法根除问题。此时需要**彻底清空 profile 环境并重装**。
+
+**核心原则：删除构建产物与依赖，保留用户数据（会话、凭据、插件持久数据）。**
+
+### 8.1 清理组件清单与保留策略
+
+以下表格记录了用户实际清理和保留的组件。**请务必依照“是否保留”列执行，以防数据丢失**：
+
+| 目标组件 | 所在位置 | 作用 | 是否清理 | 清理后是否丢失会话历史 |
+| --- | --- | --- | --- | --- |
+| **Profile 插件依赖** | `~/.dsh/profiles/web/node_modules/` | 存放所有已安装的第三方和核心插件 | **✅ 清理** | 否 |
+| **Profile 依赖清单** | `~/.dsh/profiles/web/package.json` | 记录插件依赖和 profile 的 bundles 列表 | **✅ 清理** | 否 |
+| **Profile 补丁配置** | `~/.dsh/profiles/web/cordis.patch.yml` | 手动添加的插件配置和补丁 | **✅ 清理**（重装后从备份恢复） | 否 |
+| **Profile 锁定文件** | `~/.dsh/profiles/web/pnpm-lock.yaml` | 锁定依赖的确切版本 | **✅ 清理** | 否 |
+| **Profile 包管理配置** | `~/.dsh/profiles/web/pnpm-workspace.yaml` | pnpm 的安装策略和排除规则 | **✅ 清理**（重装后重建） | 否 |
+| **凭据文件** | `~/.dsh/.credentials.yaml` | 存储 API 密钥（明文） | **❌ 保留** | 否 |
+| **会话日志** | `~/.dsh/sessions/` | **每次对话的持久化记录** | **❌ 务必保留** | **是，丢失无法恢复** |
+| **插件持久数据** | `~/.dsh/storages/` | 插件存放的持久数据（如任务看板、皮肤等） | **❌ 保留** | 可能影响部分插件功能 |
+
+> ⚠️ **高危警告**：绝对不要直接删除整个 `~/.dsh` 目录，否则 `sessions`、`.credentials.yaml` 等核心数据将永久丢失。
+
+### 8.2 标准清理与重装步骤
+
+**第一步：全量备份（安全底线）**
+在进行任何清理操作前，先备份整个 `.dsh` 目录到安全位置。
+
+```bat
+xcopy /E /I /Y "%USERPROFILE%\.dsh" "%USERPROFILE%\.dsh-backup"
+```
+
+**第二步：清理 profile 环境**
+进入 `%USERPROFILE%\.dsh\profiles\web` 目录，删除以下内容：
+
+```bat
+cd /d "%USERPROFILE%\.dsh\profiles\web"
+rmdir /S /Q node_modules
+del package.json
+del cordis.patch.yml
+del pnpm-lock.yaml
+del pnpm-workspace.yaml
+```
+
+**第三步：初始化并配置策略**
+重启 `dsh web`。DSH 会自动重新初始化 profile 目录。
+为了应对近期新发布的包被 pnpm 供应链策略拦截（`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`），需在 `web` 目录下新建 `.npmrc`，加入排除项：
+
+```ini
+minimum-release-age-exclude[]=@linxin666/*
+minimum-release-age-exclude[]=dsh-context@0.57.0
+minimum-release-age-exclude[]=dsh-session-manager@0.5.3
+```
+
+**第四步：重装插件**
+重启后，逐步安装插件。**推荐使用 `add` 命令而非 `update`**，以强制重新解析依赖树：
+
+```bat
+dsh plugin --profile web add @linxin666/dsh-web-all
+dsh plugin --profile web add dsh-better-sidebar
+dsh plugin --profile web add dsh-context
+dsh plugin --profile web add dsh-session-manager
+dsh plugin --profile web add @linxin666/dsh-i18n
+```
+
+*注意：如果安装过程中报 `ERR_PNPM_IGNORED_BUILDS`（如 `cloudflared`、`ssh2`、`node-pty` 等原生模块未授权构建），需在 `pnpm-workspace.yaml` 中添加 `allowBuilds` 字段：*
+
+```yaml
+allowBuilds:
+  cloudflared: true
+  cpu-features: true
+  ssh2: true
+```
+
+**第五步：恢复配置文件与皮肤**
+将备份中的 `cordis.patch.yml` 恢复到 `%USERPROFILE%\.dsh\profiles\web\` 下。同时，执行皮肤激活命令：
+
+```bat
+dsh-skin use miku
+```
+
+**第六步：重启并验证**
+重启 `dsh web`，检查：
+
+1. 控制台无红字报错（特别注意 `settings service is absent` 是否复现）。
+2. Web 界面能正常加载，深色主题与设定的默认模型生效。
+3. 历史会话记录完整保留。
+4. 插件管理器中所有插件状态正常。
+
+### 8.3 常见报错速查
+
+| 报错关键字 | 原因 | 解决方法 |
+| --- | --- | --- |
+| `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` | pnpm 拦截发布不足 24 小时的包 | 在 `.npmrc` 中添加 `minimum-release-age-exclude[]=<包名>@<版本>` |
+| `ERR_PNPM_IGNORED_BUILDS` | 原生模块未授权运行构建脚本 | 在 `pnpm-workspace.yaml` 中添加 `allowBuilds: { <包名>: true }` |
+| `settings service is absent` | 旧插件使用了已废弃的 `settingsScope` API | 彻底清理 `node_modules` 重装；若仍报错，说明插件未适配新版 DSH，需等待作者更新 |
+| `cannot resolve profile bundle "<包名>"` | `package.json` 的 `dsh.profile.bundles` 残留了已删除的包 | 手动编辑 `package.json`，删除 `dsh.profile.bundles` 中的对应条目 |
