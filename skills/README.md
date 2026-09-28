@@ -32,6 +32,7 @@ whenToUse: <何时该用这个 skill>   # 可选；触发场景
 | skill | 用途 |
 | --- | --- |
 | `qt-screenshot/` | 给 Qt/QML 应用启动真实窗口并按窗口句柄截图（视觉检查、多尺寸回归、排查窗口出不来 / 截图为空白 / 脚本卡死） |
+| `humanizer/` | 改写 / 审阅文本，去掉 AI 写作痕迹（not-X-but-Y 对举、单行收尾、强行三连、满篇破折号、夸大重要性、AI 套话、装饰性加粗等），让文本读起来像作者本人写的 |
 
 ## 如何将 skill 接入 DSH
 
@@ -56,9 +57,9 @@ whenToUse: <何时该用这个 skill>   # 可选；触发场景
 - `deepseek-harness\.agents\skills\*`
 - `deepseek-harness\custom\skills\*`
 
-也就是说，只要通过启动脚本进入 DSH，`custom/skills/` 下的 skill 就已经出现在
-rank 400 的扫描根里，**无需手动配置 `customSkillDirs`，也无需手工复制目录**。
-新增一个 skill 目录后，重新运行一次启动脚本即可建立联接。
+也就是说，只要通过启动脚本进入 DSH，`custom/skills/` 下的 skill（包括 `qt-screenshot`、
+`humanizer`）就已经出现在 rank 400 的扫描根里，**无需手动配置 `customSkillDirs`，
+也无需手工复制目录**。新增一个 skill 目录后，重新运行一次启动脚本即可建立联接。
 
 > Windows 上创建目录联接需要相应权限（或开发者模式）；若脚本报联接失败，
 > 请以具备权限的账户运行，或退回方式二手工建立 `mklink /J`。
@@ -92,14 +93,18 @@ rank 400 的扫描根里，**无需手动配置 `customSkillDirs`，也无需手
 ```bash
 # 复制一份（改动不会自动同步回仓库）
 cp -r <仓库根>/custom/skills/qt-screenshot "$HOME/.dsh/skills/"
+cp -r <仓库根>/custom/skills/humanizer      "$HOME/.dsh/skills/"
 
 # 或者建立目录链接，保持与仓库同步（Windows 上用 mklink /J 建目录联接）
 ln -s <仓库根>/custom/skills/qt-screenshot "$HOME/.dsh/skills/qt-screenshot"
+ln -s <仓库根>/custom/skills/humanizer     "$HOME/.dsh/skills/humanizer"
 ```
 
-注意：链接/复制过去的是 skill 目录本身。`qt-screenshot` 的正文引用仓库里的
-`custom/tools/` 脚本，若只复制了 skill，请一并复制工具目录，或设置环境变量
-`QT_SHOT_TOOLS` 指向工具实际所在位置。
+注意：链接/复制过去的是 skill 目录本身，skill 正文里引用的仓库其他目录不会跟着过去。
+
+- `qt-screenshot` 的正文引用仓库里的 `custom/tools/` 脚本；若只复制了 skill，请一并复制
+  工具目录，或设置环境变量 `QT_SHOT_TOOLS` 指向工具实际所在位置。
+- `humanizer` 是纯文本 skill，没有外部脚本依赖，复制 `SKILL.md` 即可。
 
 ### 方式四：通过插件安装
 
@@ -113,5 +118,5 @@ ln -s <仓库根>/custom/skills/qt-screenshot "$HOME/.dsh/skills/qt-screenshot"
 - 技能目录被监听：新增 skill 目录、修改已有 `SKILL.md` 会触发重新发现。
 - 通过启动脚本新建/更新联接、复制整个目录到新的根目录、或改动 `customSkillDirs`
   配置后，配置变更需要**重启 DSH**；仅内容变化通常刷新会话（新建会话）即可。
-- 验证：新建一个会话，看会话开头的可用技能列表里是否出现 `qt-screenshot`；
+- 验证：新建一个会话，看会话开头的可用技能列表里是否出现 `qt-screenshot` / `humanizer`；
   或直接让 agent「列出可用 skill」。DSH 日志里也会有解析告警，便于排查 frontmatter 写错的情况。
