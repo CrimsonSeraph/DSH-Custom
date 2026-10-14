@@ -1,7 +1,7 @@
 # 本地已安装第三方插件清单（custom/plugins）
 
 本目录记录本机在 DSH Web 运行环境中安装的**非上游（第三方）插件**清单及其安装方式，
-供重装、迁移、审计参考。快照时间：2026-09-27；上游仓库自带插件（`@deepseek-ai/dsh-*`）不在此列。
+供重装、迁移、审计参考。快照时间：2026-10-15；上游仓库自带插件（`@deepseek-ai/dsh-*`）不在此列。
 数据来自用户 web profile（`%USERPROFILE%\.dsh\profiles\web`），本文不含任何用户私人数据。
 
 ---
@@ -19,6 +19,7 @@
 | `dsh-better-sidebar` | VSCode 风格右侧边栏（explorer / editor / terminal / git / browser），按会话隔离。对外暴露 service，供其他插件注册侧边栏 tab 与文件查看器 |
 | `dsh-context` | 上下文管理插件 |
 | `dsh-session-manager` | 会话管理：删除会话需确认、归档管理 |
+| `dsh-ops` | 运维插件（GitHub: <https://github.com/T-Auto/dsh-ops.git>） |
 
 ### 2. `@linxin666/dsh-web-all` 包含的子插件
 
@@ -54,6 +55,7 @@
 | `dsh-session-manager` | 会话管理：删除会话需确认、归档管理 | `dsh plugin --profile web add dsh-session-manager` |
 | `dsh-context` | 上下文管理插件 | `dsh plugin --profile web add dsh-context` |
 | `@linxin666/dsh-i18n` | 语言包（俄语等） | `dsh plugin --profile web add @linxin666/dsh-i18n` |
+| `dsh-ops` | 运维插件（GitHub: T-Auto/dsh-ops） | `dsh plugin --profile web add https://github.com/T-Auto/dsh-ops.git` |
 
 ### 4. 皮肤
 
@@ -82,6 +84,9 @@ dsh plugin --profile web add dsh-better-sidebar
 dsh plugin --profile web add dsh-context
 dsh plugin --profile web add dsh-session-manager
 dsh plugin --profile web add @linxin666/dsh-i18n
+
+rem 安装（示例：GitHub 仓库插件）
+dsh plugin --profile web add https://github.com/T-Auto/dsh-ops.git
 
 rem 指定版本安装
 dsh plugin --profile web add @linxin666/dsh-web-all@latest
@@ -139,6 +144,7 @@ dsh plugin --profile web add dsh-better-sidebar@latest
 dsh plugin --profile web add dsh-session-manager@latest
 dsh plugin --profile web add dsh-context@latest
 dsh plugin --profile web add @linxin666/dsh-i18n@latest
+dsh plugin --profile web add https://github.com/T-Auto/dsh-ops.git
 ```
 
 ### 更新皮肤
@@ -177,6 +183,7 @@ dsh plugin --profile web remove dsh-better-sidebar
 dsh plugin --profile web remove dsh-session-manager
 dsh plugin --profile web remove dsh-context
 dsh plugin --profile web remove @linxin666/dsh-i18n
+dsh plugin --profile web remove dsh-ops
 ```
 
 ### 卸载聚合包（会同时移除全部子插件）
@@ -218,6 +225,7 @@ cannot resolve profile bundle "<包名>" from the dsh installation or <profile �
 | <https://github.com/zhu1090093659/dsh-web-ui> | dsh-web-ui 插件全家桶（`@linxin666/*`：聚合包、ssh、task-board、liangshen 等） |
 | <https://github.com/omdsh-dev/DSH-better-sidebar> | dsh-better-sidebar |
 | <https://github.com/hkkz9522/dsh-session-manager> | dsh-session-manager |
+| <https://github.com/T-Auto/dsh-ops.git> | dsh-ops |
 
 ---
 
@@ -307,6 +315,7 @@ dsh plugin --profile web add dsh-better-sidebar
 dsh plugin --profile web add dsh-context
 dsh plugin --profile web add dsh-session-manager
 dsh plugin --profile web add @linxin666/dsh-i18n
+dsh plugin --profile web add https://github.com/T-Auto/dsh-ops.git
 ```
 
 *注意：如果安装过程中报 `ERR_PNPM_IGNORED_BUILDS`（如 `cloudflared`、`ssh2`、`node-pty` 等原生模块未授权构建），需在 `pnpm-workspace.yaml` 中添加 `allowBuilds` 字段：*
