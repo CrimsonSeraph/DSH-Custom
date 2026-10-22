@@ -36,6 +36,8 @@ whenToUse: <何时该用这个 skill>   # 可选；触发场景
 | `continuous-learning/` | 持续学习系统：从工作会话中提取可复用知识并沉淀为新的 dsh skill。触发于完成任务、调试排错、发现非显而易见的解决方案、总结项目特定模式、解决误导性错误、优化工作流之后，或用户执行 `/retrospective`、说“保存为 skill”“我们学到了什么”时；评估当前工作是否包含有价值、可复用的知识，并在合适时创建新 skill |
 | `comment-log-doc-maintenance/` | 对一个项目做注释 / 日志 / 文档三类维护（三个独立、可审阅、各一次提交的任务）：清理注释（去装饰分割线、统一 Doxygen `@brief` 与 `///<` 风格、长注释迁入就近非根 README）、按既有日志宏重构日志（删除热点路径上的成功日志、用键控的只报一次守卫保留诊断）、用 humanizer 做文档润色（修断链、纠正 changelog 与文件列表可证伪的过期内容、统一术语）；不改变行为、签名、构建配置与 changelog，每个任务各一次提交 |
 | `ui-design/` | 专业 UI 设计与前端实现规范：核心规范 + 8 个专项模块（Web、桌面、移动、表单、仪表盘、营销页、创作工具、实现与验证），按任务类型按需加载对应模块；适用于设计、生成、评审或实现界面，改善视觉层级、可用性、可访问性、响应式、设计系统、交互状态，或避免通用 AI 风格 UI |
+| `app-icon-gen/` | 从 JSON spec 生成跨平台应用图标源资产：语义分层创作（2-5 个 SVG/PNG 图层）、圆角预览与非圆角源画布、验证报告，并在需要时可选导出 Apple Icon Composer 包。包含 Node.js 渲染/验证/裁剪脚本及大量设计参考文档 |
+| `app-icon-template-creator/` | 从参考图标（图片/SVG/截图）提炼可复用的 `app-icon-gen` 风格模板：分析源图标视觉语法、进行重建和迁移测试，最终产出一份兼容 `app-icon-gen` 的 Markdown 模板。依赖 `app-icon-gen` 和图像生成工具，包含模板 Lint 脚本 |
 
 ## 如何将 skill 接入 DSH
 
@@ -61,8 +63,9 @@ whenToUse: <何时该用这个 skill>   # 可选；触发场景
 - `deepseek-harness\custom\skills\*`
 
 也就是说，只要通过启动脚本进入 DSH，`custom/skills/` 下的 skill（包括 `qt-screenshot`、
-`humanizer`、`continuous-learning`、`comment-log-doc-maintenance`、`ui-design`）就已经出现在
-rank 400 的扫描根里，**无需手动配置 `customSkillDirs`，也无需手工复制目录**。
+`humanizer`、`continuous-learning`、`comment-log-doc-maintenance`、`ui-design`、
+`app-icon-gen`、`app-icon-template-creator`）就已经出现在 rank 400 的扫描根里，
+**无需手动配置 `customSkillDirs`，也无需手工复制目录**。
 
 > Windows 上创建目录联接需要相应权限（或开发者模式）；若脚本报联接失败，
 > 请以具备权限的账户运行，或退回方式二手工建立 `mklink /J`。
@@ -99,12 +102,18 @@ cp -r <仓库根>/custom/skills/qt-screenshot                  "$HOME/.dsh/skill
 cp -r <仓库根>/custom/skills/humanizer                      "$HOME/.dsh/skills/"
 cp -r <仓库根>/custom/skills/continuous-learning            "$HOME/.dsh/skills/"
 cp -r <仓库根>/custom/skills/comment-log-doc-maintenance    "$HOME/.dsh/skills/"
+cp -r <仓库根>/custom/skills/ui-design                      "$HOME/.dsh/skills/"
+cp -r <仓库根>/custom/skills/app-icon-gen                   "$HOME/.dsh/skills/"
+cp -r <仓库根>/custom/skills/app-icon-template-creator      "$HOME/.dsh/skills/"
 
 # 或者建立目录链接，保持与仓库同步（Windows 上用 mklink /J 建目录联接）
 ln -s <仓库根>/custom/skills/qt-screenshot                  "$HOME/.dsh/skills/qt-screenshot"
 ln -s <仓库根>/custom/skills/humanizer                      "$HOME/.dsh/skills/humanizer"
 ln -s <仓库根>/custom/skills/continuous-learning            "$HOME/.dsh/skills/continuous-learning"
 ln -s <仓库根>/custom/skills/comment-log-doc-maintenance    "$HOME/.dsh/skills/comment-log-doc-maintenance"
+ln -s <仓库根>/custom/skills/ui-design                      "$HOME/.dsh/skills/ui-design"
+ln -s <仓库根>/custom/skills/app-icon-gen                   "$HOME/.dsh/skills/app-icon-gen"
+ln -s <仓库根>/custom/skills/app-icon-template-creator      "$HOME/.dsh/skills/app-icon-template-creator"
 ```
 
 注意：链接/复制过去的是 skill 目录本身，skill 正文里引用的仓库其他目录不会跟着过去。
@@ -117,6 +126,10 @@ ln -s <仓库根>/custom/skills/comment-log-doc-maintenance    "$HOME/.dsh/skill
 - `ui-design` 为纯文本 skill，但正文通过相对路径按需加载 `modules/` 下的 8 个专项文件；
   复制或链接时必须保持**整个目录结构完整**（`SKILL.md` + `modules/`），不能只复制 `SKILL.md`，
   否则模块加载会失败。其目录名必须与 frontmatter 中的 `name: ui-design` 一致。
+- `app-icon-gen` 和 `app-icon-template-creator` 包含 Node.js 脚本和丰富的参考资料。复制或链接时
+  必须保持**整个目录结构完整**（包括 `scripts/`、`references/`、`examples/` 等）。首次使用前，
+  需在各自目录的 `scripts/` 下运行 `npm ci` 或 `npm install` 安装依赖（要求 Node.js >= 22）。
+  此外，`app-icon-template-creator` 依赖 `app-icon-gen` 以及一个可用的图像生成能力，两者需同时可用。
 
 ### 方式四：通过插件安装
 
@@ -131,5 +144,6 @@ ln -s <仓库根>/custom/skills/comment-log-doc-maintenance    "$HOME/.dsh/skill
 - 通过启动脚本新建/更新联接、复制整个目录到新的根目录、或改动 `customSkillDirs`
   配置后，配置变更需要**重启 DSH**；仅内容变化通常刷新会话（新建会话）即可。
 - 验证：新建一个会话，看会话开头的可用技能列表里是否出现 `qt-screenshot` / `humanizer` /
-  `continuous-learning` / `comment-log-doc-maintenance`；或直接让 agent「列出可用 skill」。
+  `continuous-learning` / `comment-log-doc-maintenance` / `ui-design` / `app-icon-gen` /
+  `app-icon-template-creator`；或直接让 agent「列出可用 skill」。
   DSH 日志里也会有解析告警，便于排查 frontmatter 写错的情况。
