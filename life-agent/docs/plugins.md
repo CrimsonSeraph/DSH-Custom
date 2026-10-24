@@ -5,7 +5,7 @@
 
 ## 1. 本阶段范围与结论
 
-- 目标 profile：`life`（`C:\Users\LTYY\.dsh\profiles\life`），与任务书 §4.1 的 `desktop` 不同，原因见第 2 节。
+- 目标 profile：`life`（`%USERPROFILE%\.dsh\profiles\life`），与任务书 §4.1 的 `desktop` 不同，原因见第 2 节。
 - 已装好三个包：`dsh-dot@0.6.0`、`dsh-vdesktop@0.2.0`、`@xmanrui/dsh-im@5.4.0`。
 - `dsh --profile life --dump-config` 退出码 0、stderr 为空，五个 bundle 层全部参与组装。
 - 未创建 AVD，未执行 `/phone accept`，未验证 VDesktopPanel，未接模型端点。
@@ -22,7 +22,7 @@
    error: profile "desktop" is managed exclusively by the Electron application
    ```
 
-2. 拒绝点定位在 `C:\Users\LTYY\AppData\Local\pnpm\global\v11\d1cc-1a13c1f5573\node_modules\@deepseek-ai\dsh\lib\bin.js`：
+2. 拒绝点定位在 `<DSH 安装目录>\lib\bin.js`：
    第 35-37 行的 `rejectElectronProfile()` 对 `profile.toLowerCase() === "desktop"` 直接 `program.error`；
    第 112 行（boot 路径）无条件调用它，第 119 行（plugin 路径）只有 `manageDesktopProfile` 为 true 时放行。
    `manageDesktopProfile` 是 `runCli(options)` 的编程参数（同文件第 209 行），只由 Electron 载体进程传入，
@@ -74,7 +74,7 @@ dependencies:
 + dsh-vdesktop 0.2.0
 
 [ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.23.1
-dsh: plugin command failed; diagnostics: C:\Users\LTYY\.dsh\profiles\life\.plugin-manager\logs\operation-exW5Wo\pnpm.log
+dsh: plugin command failed; diagnostics: %USERPROFILE%\.dsh\profiles\life\.plugin-manager\logs\operation-exW5Wo\pnpm.log
 ```
 
 三个包全部安装成功。CLI 因 `ERR_PNPM_IGNORED_BUILDS` 返回非零，但该警告不影响本用途：
@@ -103,7 +103,7 @@ dsh --profile life --dump-config
 
 ## 4. life profile 的 package.json 全文
 
-`C:\Users\LTYY\.dsh\profiles\life\package.json`：
+`%USERPROFILE%\.dsh\profiles\life\package.json`：
 
 ```json
 {
@@ -137,7 +137,7 @@ dsh --profile life --dump-config
 
 ```
 $ dsh plugin --profile life list --depth=0
-dsh-profile-life C:\Users\LTYY\.dsh\profiles\life (PRIVATE)
+dsh-profile-life %USERPROFILE%\.dsh\profiles\life (PRIVATE)
 │   dependencies:
 ├── @xmanrui/dsh-im@5.4.0
 ├── dsh-dot@0.6.0
@@ -210,7 +210,7 @@ dsh-profile-life C:\Users\LTYY\.dsh\profiles\life (PRIVATE)
   硬编码成作者机器上的 `D:\Project\dsh-virtaul-computer\sidecar`（编译产物 `lib/index.js` 里甚至退化成
   `D:Projectdsh-virtaul-computersidecar`），本机不存在该路径，sidecar 起不来、`vdesk_*` 全部不可用。
 
-  已在 `C:\Users\LTYY\.dsh\profiles\life\cordis.patch.yml` 里按条目 id `vdesktop` 覆盖为本机路径：
+  已在 `%USERPROFILE%\.dsh\profiles\life\cordis.patch.yml` 里按条目 id `vdesktop` 覆盖为本机路径：
 
   ```yaml
   # profile-layer patch replaces the whole config object, so restate every key the bundle set.
@@ -218,7 +218,7 @@ dsh-profile-life C:\Users\LTYY\.dsh\profiles\life (PRIVATE)
     config:
       sidecarPath: python
       sidecarArgs: ['-m', 'dshv', '--rpc', 'stdio']
-      sidecarCwd: 'C:\Users\LTYY\.dsh\profiles\life\node_modules\dsh-vdesktop\sidecar'
+      sidecarCwd: '%USERPROFILE%\.dsh\profiles\life\node_modules\dsh-vdesktop\sidecar'
       callTimeoutMs: 60000
   ```
 
@@ -232,7 +232,7 @@ dsh-profile-life C:\Users\LTYY\.dsh\profiles\life (PRIVATE)
      这条覆盖不会自动带上，必须手动补。
 
   覆盖生效的实证：`dsh --profile life --dump-config` 中该层显示为
-  `# == dsh-vdesktop, patched by C:\Users\LTYY\.dsh\profiles\life\cordis.patch.yml`，
+  `# == dsh-vdesktop, patched by %USERPROFILE%\.dsh\profiles\life\cordis.patch.yml`，
   其 `sidecarCwd` 值为本机路径，退出码 0、stderr 为空。
   本机 `python` 可用，版本 3.13.9（`requires-python >=3.11`，无第三方依赖）。
 
