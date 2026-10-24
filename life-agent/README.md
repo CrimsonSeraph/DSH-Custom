@@ -51,3 +51,5 @@ DSH 不替用户决定性格，人设由用户填充。
 | `e02828c` | chore(local-model): 落地本地 Qwen3.5-9B 启动脚本与实测调优记录 |
 | `90b4a48` | fix(local-model): 修正默认监听地址与端口 |
 | `6e53968` | docs(plugins): 记录 dsh-dot、dsh-im 与 dsh-vdesktop 安装配置 |
+| `2ddf624` | docs(life-agent): 记录插件阶段提交哈希 |
+| `1457123` | docs(local-model): 记录在 DSH 中接入本地端点的写法 |
