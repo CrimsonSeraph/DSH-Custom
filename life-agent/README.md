@@ -50,3 +50,4 @@ DSH 不替用户决定性格，人设由用户填充。
 | `0ff3edc` | chore(scripts): 启动脚本追加生活型 skill 与 MCP 联接 |
 | `e02828c` | chore(local-model): 落地本地 Qwen3.5-9B 启动脚本与实测调优记录 |
 | `90b4a48` | fix(local-model): 修正默认监听地址与端口 |
+| `6e53968` | docs(plugins): 记录 dsh-dot、dsh-im 与 dsh-vdesktop 安装配置 |
