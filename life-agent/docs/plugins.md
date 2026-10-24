@@ -316,3 +316,62 @@ dsh-profile-life %USERPROFILE%\.dsh\profiles\life (PRIVATE)
 | `~/.dsh/cordis.patch.yml` | `9aa69ff8536916a3d0db756d0dfaab2d` | `9aa69ff8536916a3d0db756d0dfaab2d` |
 
 `~/.dsh/settings.yaml` 在本次任务前后都不存在，未创建也未改动。
+
+## 7.1 本地补丁：让 vdesktop 能激活（上游缺陷）
+
+启动 `dsh life` 时 vdesktop 报错：
+
+```
+vdesktop (dsh-vdesktop): Error: cannot get property "tools" without inject
+    at registerTools (.../dsh-vdesktop/lib/index.js:651)
+```
+
+### 原因
+
+上游 `lib/index.js` 把插件写成：
+
+```js
+var inject = ["computerUse", "tools"];
+export { apply, src_default as default, inject, name };
+```
+
+即 `inject` 是**平级的命名导出**，没有挂到插件函数上。而 Cordis 只读 `plugin.inject`
+（`vendor/cordis/lib/index.js:1635`：`new Fiber(..., Inject.resolve(plugin.inject), ...)`），
+拿到 `undefined` 就等于声明"我不依赖任何服务"，于是访问 `ctx.tools` 时被
+`lib/index.js:676` 的守卫拒绝。核心插件（如 `@deepseek-ai/dsh-tools`）都是类，
+用 `static inject = [...]` 声明，所以不会踩到。
+
+### 第二个坑
+
+不能把 `inject` 原样挂上去：life profile **没有提供 `computerUse` 服务**（dump-config 里查不到）。
+声明一个不存在的服务会让插件进入"等待服务"状态，永远不激活，症状从报错变成静默不加载。
+
+### 修法
+
+在 `node_modules/dsh-vdesktop/lib/index.js` 末尾（`export` 之前）补三行：
+
+```js
+apply.inject = inject.filter((s) => s !== "computerUse");
+```
+
+只注入 `tools`。插件里访问 `ctx.computerUse` 的那段本来就在 `try/catch` 里，
+缺服务时只打一行 warn 然后跳过，vdesk_* 工具照常注册。
+
+**注意**：`apply.name = name` 不能写——函数的 `name` 是只读属性，ESM 严格模式下赋值会直接抛
+`Cannot assign to read only property 'name'`，反而把模块搞成 import 失败。
+
+### 这是本地补丁，重装会丢
+
+补丁改的是 `node_modules` 里的产物，`dsh plugin remove/add` 或升级 `dsh-vdesktop` 后会消失。
+重装后需要重新应用，判据是启动时是否再报 `without inject`。
+建议向上游反馈：把 `inject` 挂到插件对象上，或改成类 + `static inject`。
+
+### 验证
+
+```powershell
+dsh life --no-open --port 3099    # 换端口，避免和正在运行的实例抢 3080
+```
+
+- 修复前：启动日志报 `1 entry did not activate` + `without inject`
+- 修复后：无报错，且能观察到 sidecar 进程
+  `python -m dshv --rpc stdio`（该进程只在插件 `apply()` 里 spawn，它活着即证明插件已激活）
