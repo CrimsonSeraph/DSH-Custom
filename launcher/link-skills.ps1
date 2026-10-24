@@ -27,6 +27,9 @@ $sourceDirs = @(
   (Join-Path $AppDir 'custom\skills')
 )
 
+# 生活型 Agent 追加区：仅追加生活型 skill 源目录，只新增不替换上面两条自用联接
+$sourceDirs += (Join-Path $AppDir 'custom\life-agent\skills')
+
 function Get-NormalizedPath {
   param([string]$Path)
   if (-not $Path) { return $null }

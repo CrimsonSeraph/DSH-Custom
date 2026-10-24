@@ -84,3 +84,93 @@ start-dsh.bat
   控制台里 `dsh web:` 开头的完整地址到浏览器打开（只访问一次后浏览器会保存 30 天 cookie，之后裸地址也可用）。
 - **中文乱码**：两个脚本以 GBK（代码页 936）保存以匹配中文 Windows 控制台（cmd 默认代码页 936）；若系统为其他区域设置，中文可能显示为乱码，可将脚本转为对应代码页或启用系统级 UTF-8（`chcp 65001` 需要脚本以 UTF-8 保存，二者不可混用）。
 - **报错 `... was unexpected at this time.`**：位于括号块内的 echo 文本不能包含未转义的 ASCII 半角括号（cmd 会将其解析为嵌套块，紧随其后的内容被当作命令）。本脚本已统一改用全角括号（如（pnpm install --ignore-scripts））；自行修改时请沿用此约定，或用 `^(` / `^)` 转义。
+
+## 生活型 Agent 接入（skill 联接与 MCP 合并）
+
+`custom\life-agent\` 是生活型 Agent 的自有目录。本节说明 launcher 目录里为它新增的两个入口，
+两处改动都是 **只新增、不替换**：原有两条自用 skill 联接与已注册的自用 MCP server 一律保留。
+
+### 1. 生活型 skill 联接（`link-skills.ps1`）
+
+`link-skills.ps1` 的 `$sourceDirs` 原本只有 `<AppDir>\.agents\skills` 与 `<AppDir>\custom\skills` 两项，
+现于数组末尾追加第三项 `<AppDir>\custom\life-agent\skills`（原两项的文本、顺序均未改动）：
+
+```powershell
+$sourceDirs = @(
+  (Join-Path $AppDir '.agents\skills'),
+  (Join-Path $AppDir 'custom\skills')
+)
+
+# 生活型 Agent 追加区：仅追加生活型 skill 源目录，只新增不替换上面两条自用联接
+$sourceDirs += (Join-Path $AppDir 'custom\life-agent\skills')
+```
+
+新增源目录只贡献生活型 Agent 自己的 skill；联接规则不变（已存在真实目录时告警跳过，
+指向别处的 junction 刷新，PS 5.1 下用 `[System.IO.Directory]::Delete` 删除联接而非 `Remove-Item -Recurse`）。
+
+```powershell
+.\link-skills.ps1 -AppDir F:\Projects\deepseek-harness
+```
+
+### 2. 生活型 MCP 合并（`link-life-mcp.ps1`）
+
+把 `custom\life-agent\mcp\mcp.servers.json` 里的 server 定义合并进目标 DSH profile 的 `cordis.patch.yml`。
+规则是 **只补缺失**：目标 profile 里已有同名 server 时跳过并打印出来，绝不覆盖自用配置。
+
+| 参数 | 默认 | 说明 |
+| --- | --- | --- |
+| `-Profile` | `desktop` | 目标 profile 名，对应 `<DSH 目录>\profiles\<Profile>`；目录不存在直接报错退出，不会自动创建 |
+| `-LifeMcp` | 推断为 `custom\life-agent\mcp\mcp.servers.json` | 生活型 MCP 定义文件路径 |
+| `-DryRun` | 关 | 预演开关：只打印将追加的 YAML 与备份路径，不建备份、不写文件 |
+
+DSH 目录取环境变量 `DSH_HOME`，未设置时用 `~\.dsh`。
+
+```powershell
+# 预演：看清会新增哪些 server
+.\link-life-mcp.ps1 -Profile web -DryRun
+
+# 真实合并（先备份，再追加，再自检）
+.\link-life-mcp.ps1 -Profile web
+```
+
+行为要点：
+
+- **探测已有 server**：读目标 profile 的 `cordis.yml` 与 `cordis.patch.yml`，外加 DSH 根级 `cordis.patch.yml`
+  （本机的 `godot` / `qtcreator` 就注册在根级 patch 里，工具名形如 `mcp__godot__*`）。识别 `serverName:`、
+  `id: mcp-<名>` 与 `mcp__<名>__` 三种写法，命中即跳过。
+- **备份**：写入前复制为 `cordis.patch.yml.bak-life-mcp-<yyyyMMdd-HHmmss>`；同一秒重复执行时追加序号。
+- **只追加**：新条目以 `- insert:` 块追加到文件末尾，原有内容逐字保留（写入前记录原文，写后比对前缀）。
+- **写后自检**：脚本内置一个最小 YAML 子集解析器，解析整份结果文件并核对每个新增条目的 `id` 与 `serverName`；
+  自检失败会自动回滚到备份（新建的文件则删除）并以退出码 1 结束。目标文件含块标量等超出子集的结构时，
+  自检退化为只校验新增块，并在输出里说明。
+- **保留编码与换行**：沿用目标文件原有的 BOM 与换行风格（该文件默认 LF、无 BOM）。
+
+定义文件中的每个 server 键即 `serverName`，取值是 `dsh-mcp-client` 的配置体：
+
+```json
+{
+  "version": 1,
+  "servers": {
+    "life-demo": {
+      "transport": "stdio",
+      "command": "node",
+      "args": ["F:/path/to/index.js"],
+      "env": { "DEMO_HOME": "F:/path/to" }
+    },
+    "life-http": {
+      "transport": "streamable-http",
+      "url": "http://127.0.0.1:46001/",
+      "headers": { "X-Life-Agent": "1" }
+    }
+  }
+}
+```
+
+允许字段：`transport`（必填，`stdio` 或 `streamable-http`）、`command` / `args` / `env` / `cwd`（stdio）、
+`url` / `headers`（streamable-http）、`failOnStartupError`，以及条目层的 `id` / `disabled`。
+未知字段、缺 `command` 或 `url`、`transport` 取值非法都会直接报错退出，不做静默猜测。
+
+写入的条目形状与本机既有的 MCP 注册一致（`@deepseek-ai/dsh-mcp-client` 的 `- insert:` 块），
+`cordis.patch.yml` 支持 HMR，保存后即生效，无需重启 `dsh`。
+
+本阶段只交付脚本：默认不执行任何真实合并，`-DryRun` 之外的操作需手动运行。
