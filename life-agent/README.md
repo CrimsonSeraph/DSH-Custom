@@ -19,7 +19,7 @@ DSH 不替用户决定性格，人设由用户填充。
 | `README.md` | 本说明：边界规则、目录职责、自用与生活型的对照、提交记录 |
 | `canon\` | 权威文本：人设模板（persona.md）等长期有效的定义 |
 | `prompts\` | 行为 prompt 模板：幕间生活（interlude.md）、IM 主动联系（im-contact.md） |
-| `skills\` | 生活型专用 skill，仅在生活型会话中加载 |
+| `skills\` | 生活型专用 skill，仅在生活型会话中加载（当前只有 `.gitkeep`，**待启用**：尚未放入任何 skill，`launcher/link-skills.ps1` 对空目录不产生联接） |
 | `mcp\` | 生活型 MCP server 清单源（mcp.servers.json），合并时只补缺失项 |
 | `local-model\` | 本地模型相关配置与说明；模型权重本体在 `G:\LocalAI`，不在此目录 |
 | `docs\` | 设计说明、运行记录与后续阶段文档 |
@@ -49,3 +49,4 @@ DSH 不替用户决定性格，人设由用户填充。
 | `a4c3656` | docs(life-agent): 补全隔离边界与外部仓库登记文档 |
 | `0ff3edc` | chore(scripts): 启动脚本追加生活型 skill 与 MCP 联接 |
 | `e02828c` | chore(local-model): 落地本地 Qwen3.5-9B 启动脚本与实测调优记录 |
+| `90b4a48` | fix(local-model): 修正默认监听地址与端口 |
