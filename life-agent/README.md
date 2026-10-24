@@ -48,3 +48,4 @@ DSH 不替用户决定性格，人设由用户填充。
 | `09a64eb` | feat(life-agent): 创建生活型 Agent 目录骨架与人设模板 |
 | `a4c3656` | docs(life-agent): 补全隔离边界与外部仓库登记文档 |
 | `0ff3edc` | chore(scripts): 启动脚本追加生活型 skill 与 MCP 联接 |
+| `e02828c` | chore(local-model): 落地本地 Qwen3.5-9B 启动脚本与实测调优记录 |

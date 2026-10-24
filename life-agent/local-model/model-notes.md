@@ -21,8 +21,8 @@
 | `-ngl`（`--n-gpu-layers`） | 28 | **99** | 卸载到 GPU 的层数，99 表示全部层。基线 28 层时约 1/6 的层留在 CPU，解码仅 3.4 tok/s；全量卸载后同尺寸上下文提升 2–6 倍。调优方向：始终先试满（99），再靠降低 `-c` 或关闭其它 GPU 程序腾显存，而不是降层数。 |
 | `--reasoning-budget` | 0 | **0** | 思考链预算。0 = 立刻结束思考、直接给答案，本地小模型上这一步能省掉大量无意义 token。需要看推理过程时改成 -1（不限）或一个正整数。 |
 | `--mmproj` | `mmproj-F16.gguf` | **`mmproj-F16.gguf`** | 视觉投影器路径。必须与主模型配套（同仓库同一版本），否则图像特征维度不匹配。 |
-| `--host` | 0.0.0.0 | **0.0.0.0** | 监听地址。0.0.0.0 表示监听所有网卡、局域网内其它机器可直接访问；服务本身无鉴权，仅本机使用时应改为 127.0.0.1。 |
-| `--port` | 8080 | **8080** | 监听端口。本机 127.0.0.1:8080 被 Steam 占用，用回环地址访问时需要错开到别的端口。 |
+| `--host` | 0.0.0.0 | **127.0.0.1** | 监听地址。默认只绑回环地址，仅本机可访问；需要局域网访问时显式传 0.0.0.0（0.0.0.0 表示监听所有网卡，同网段任何机器都能调用，且服务无鉴权）。 |
+| `--port` | 8080 | **8090** | 监听端口。本机 127.0.0.1:8080 被 Steam 的 steamwebhelper 占用，8080 上的请求到不了模型，故默认用 8090；端口再被占用时只改这里，不影响模型参数与第 3 节实测值。 |
 
 ## 3. 实测记录
 
@@ -87,13 +87,14 @@ TIMINGS: {"prompt_n": 4, "prompt_ms": 173.55, "prompt_per_second": 23.05,
 
 ## 5. 端口冲突（本机特有）
 
-本机 `127.0.0.1:8080` 被 Steam 的 `steamwebhelper.exe` 占用，但 **`--host 0.0.0.0 --port 8080` 实测可正常绑定**
-（日志：`listening on http://0.0.0.0:8080`），因为 Steam 只占了回环地址上的这个端口。实际影响是：
-服务起来之后 **不能再用 `127.0.0.1:8080` 访问**（发往该地址的请求会落到 Steam），要改用网卡地址或换端口。
+本机 `127.0.0.1:8080` 已被 Steam 的 `steamwebhelper.exe`（PID 24708，netstat 显示 LISTENING）占用：
+把服务绑到 8080 后，发往 `127.0.0.1:8080` 的请求会打到 Steam 而不是模型，DSH 端点也就接不上推理服务。
+因此**最终默认监听改为 `127.0.0.1:8090`**。
 
-- 默认参数启动后，本机访问用 `http://10.6.88.183:8080`：最终验收即此方式，带图请求返回 HTTP 200。
-- 想继续用 `127.0.0.1` 访问：加 `-Port 8090`，此时 `-HostAddr 127.0.0.1` 也能绑定。
-- 关闭 Steam 后 `127.0.0.1:8080` 完全释放，可直接 `-HostAddr 127.0.0.1`。
+- 选 8090：实测空闲；同时默认只绑回环地址，不把没有鉴权的推理服务暴露到局域网。
+- 需要局域网访问：显式传 `-HostAddr 0.0.0.0`（实测可正常绑定），注意此时同网段任何机器都能调用本服务。
+- 若 8090 也被占用：只改 `-Port` 即可，端口不影响模型参数与第 3 节的实测值。
+- 关闭 Steam 后 8080 空出来，也可以直接 `-Port 8080`。
 
 ## 6. 复现步骤
 
@@ -120,7 +121,7 @@ curl.exe -L --ssl-no-revoke -C - -o "G:\LocalAI\models\Qwen3.5-9B\mmproj-F16.ggu
 # 5. 确认 GPU 可见
 G:\LocalAI\tools\llama.cpp\llama-server.exe --list-devices
 
-# 6. 启动（本机 8080 被 Steam 占用时加 -HostAddr 或 -Port）
+# 6. 启动（默认 127.0.0.1:8090；需要局域网访问时加 -HostAddr 0.0.0.0）
 powershell -ExecutionPolicy Bypass -File .\start-llama-server.ps1
 
 # 7. 带图请求自检（PowerShell）
@@ -128,7 +129,7 @@ $img = [Convert]::ToBase64String([IO.File]::ReadAllBytes("G:\LocalAI\logs\test-i
 $body = @{ model="qwen"; max_tokens=200; messages=@(@{ role="user"; content=@(
   @{ type="text"; text="用简洁的中文描述这张图片的主要内容，包括图形、颜色和文字。" },
   @{ type="image_url"; image_url=@{ url="data:image/png;base64,$img" } }) }) } | ConvertTo-Json -Depth 10
-Invoke-RestMethod -Uri "http://127.0.0.1:8080/v1/chat/completions" -Method Post -ContentType "application/json; charset=utf-8" -Body $body
+Invoke-RestMethod -Uri "http://127.0.0.1:8090/v1/chat/completions" -Method Post -ContentType "application/json; charset=utf-8" -Body $body
 
 # 8. 边请求边看显存
 nvidia-smi --query-gpu=memory.used,utilization.gpu --format=csv -l 1

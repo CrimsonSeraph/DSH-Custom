@@ -5,14 +5,14 @@
   （RTX 5070 Ti Laptop，12227 MiB，llama.cpp build 11853，CUDA 13.4 构建），
   换机器、换驱动或换量化后需要重新实测，方法见同目录 model-notes.md 的「复现步骤」。
 
-  本机已知冲突：127.0.0.1:8080 已被 Steam 的 steamwebhelper 占用。默认的 -HostAddr 0.0.0.0
-  不受影响（实测可正常监听），但此时本机访问不能用 127.0.0.1:8080，要改用网卡地址
-  （例如 http://10.6.88.183:8080）；若想继续用 127.0.0.1 访问，请配合 -Port 8090。
-  详见 model-notes.md「端口冲突」一节。
+  监听默认 127.0.0.1:8090：本机 127.0.0.1:8080 已被 Steam 的 steamwebhelper 占用（实测该端口上的
+  请求会打到 Steam 而不是模型），所以默认端口避开 8080、改用 8090；同时默认只绑回环地址，
+  不把没有鉴权的推理服务暴露到局域网。需要局域网访问时显式传 -HostAddr 0.0.0.0，
+  注意此时同网段任何机器都能调用本服务且没有鉴权。详见 model-notes.md「端口冲突」一节。
 #>
 param(
-    [string]$HostAddr = '0.0.0.0',   # --host：监听所有网卡（局域网可见）；仅本机使用请传 -HostAddr 127.0.0.1
-    [int]$Port = 8080                # --port
+    [string]$HostAddr = '127.0.0.1', # --host：默认只绑回环地址，仅本机可用；需要局域网访问时显式传 -HostAddr 0.0.0.0（服务无鉴权）
+    [int]$Port = 8090                # --port：默认 8090，避开被 Steam 占用的 127.0.0.1:8080；端口被占用时改这里即可
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,7 +33,9 @@ foreach ($p in @($server, $MODEL, $MMPROJ)) {
 }
 
 Write-Host "启动 llama-server：ctx=$CTX ngl=$NGL host=$HostAddr port=$Port"
-Write-Host "注意：-HostAddr $HostAddr 表示监听所有网卡，局域网内其它机器可直接访问本服务；只在本机使用请改用 -HostAddr 127.0.0.1，避免把无鉴权的推理服务暴露到局域网。"
+if ($HostAddr -eq '0.0.0.0') {
+    Write-Host "注意：-HostAddr 0.0.0.0 表示监听所有网卡，局域网内其它机器可直接访问本服务；该服务没有鉴权，仅本机使用请用默认的 127.0.0.1。"
+}
 
 & $server `
     -m $MODEL `
