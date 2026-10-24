@@ -134,3 +134,69 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8090/v1/chat/completions" -Method Post 
 # 8. 边请求边看显存
 nvidia-smi --query-gpu=memory.used,utilization.gpu --format=csv -l 1
 ```
+
+## 7. 在 DSH 中接入这个端点（实测可用）
+
+本节记录「怎么让 DSH 把请求打到上面的 llama-server」，配置本身在 DSH 的 profile 里（不入库），
+这里只留可复现的写法与理由，换机器时照抄即可。
+
+### 7.1 前置
+
+llama-server 不是常驻服务，会话前需要先启动：
+
+```powershell
+F:\Projects\deepseek-harness\custom\life-agent\local-model\start-llama-server.ps1
+```
+
+确认端点活着，再启动 DSH 会话：
+
+```powershell
+curl http://127.0.0.1:8090/health          # 期望 {"status":"ok"}
+curl http://127.0.0.1:8090/v1/models      # 记下返回的真实模型 id
+```
+
+### 7.2 接入位置与写法
+
+接入点是 `@deepseek-ai/dsh-llm-pi-ai` 的 `providers` 字典。写进目标 profile 的
+`cordis.patch.yml`（本机为 `~/.dsh/profiles/life/cordis.patch.yml`）：
+
+```yaml
+- id: llm-pi-ai
+  config:
+    providers:
+      local-qwen:
+        displayName: 本地 Qwen3.5-9B (llama.cpp)
+        api: openai-completions
+        baseURL: 'http://127.0.0.1:8090/v1'
+        models:
+          - id: 'G:\LocalAI\models\Qwen3.5-9B\Qwen3.5-9B-Q4_K_M.gguf'
+            name: Qwen3.5-9B (Q4_K_M)
+            contextWindow: 16384
+            maxTokens: 4096
+            input: [text, image]
+```
+
+### 7.3 四个容易踩的点
+
+- **模型 id 是 llama.cpp 返回的完整文件路径**，不是 `qwen` 之类的短名。必须与 `/v1/models` 的
+  `data[0].id` 逐字一致，否则请求匹配不上。
+- **不要设 `apiKeyEnv`**。llama-server 无鉴权；设一个不存在的环境变量会让解析以
+  `MISSING_CREDENTIAL` 失败。省略即不带凭据。
+- **`api` 取 `openai-completions`**（该插件支持的协议之一，另有 `openai-responses`、
+  `anthropic-messages`，由运行时枚举确认）。
+- **profile patch 层是整体替换 `config` 对象**，不是逐键合并。覆盖 `llm-pi-ai` 时要把
+  `providers` 整个写全；同一文件里别的条目（例如 `vdesktop`）也必须各自重述全部键，否则会被删空。
+
+### 7.4 验证
+
+```powershell
+dsh --profile life --dump-config   # 期望 exit 0 且 stderr 为空
+```
+
+再在 dump 里确认 `local-qwen` 的 `baseURL` 与 `vdesktop` 的 `sidecarCwd` 同时存在。
+
+### 7.5 与 DeepSeek API 的切换
+
+本配置只是**新增一条可选路由**，不改变默认模型：`agent-default-model` 未改动，
+默认仍走原来的 DeepSeek。要让生活型 Agent 用本地模型，在会话里切到 `local-qwen` 路由即可；
+切换时记得先启动 llama-server，否则连接被拒。
