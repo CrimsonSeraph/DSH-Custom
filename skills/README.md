@@ -38,6 +38,7 @@ whenToUse: <何时该用这个 skill>   # 可选；触发场景
 | `ui-design/` | 专业 UI 设计与前端实现规范：核心规范 + 8 个专项模块（Web、桌面、移动、表单、仪表盘、营销页、创作工具、实现与验证），按任务类型按需加载对应模块；适用于设计、生成、评审或实现界面，改善视觉层级、可用性、可访问性、响应式、设计系统、交互状态，或避免通用 AI 风格 UI |
 | `app-icon-gen/` | 从 JSON spec 生成跨平台应用图标源资产：语义分层创作（2-5 个 SVG/PNG 图层）、圆角预览与非圆角源画布、验证报告，并在需要时可选导出 Apple Icon Composer 包。包含 Node.js 渲染/验证/裁剪脚本及大量设计参考文档 |
 | `app-icon-template-creator/` | 从参考图标（图片/SVG/截图）提炼可复用的 `app-icon-gen` 风格模板：分析源图标视觉语法、进行重建和迁移测试，最终产出一份兼容 `app-icon-gen` 的 Markdown 模板。依赖 `app-icon-gen` 和图像生成工具，包含模板 Lint 脚本 |
+| `agent-desktop/` | 桌面自动化：通过 OS 无障碍树观察并操作原生桌面应用（点击、填表、菜单、滚动、拖拽、输入、快捷键、截图、窗口管理、剪贴板、通知），不依赖视觉模型；CLI 由 `npm install -g agent-desktop` 全局安装，`SKILL.md` 正文取自其二进制内嵌的官方说明 |
 
 ## 如何将 skill 接入 DSH
 
@@ -64,7 +65,7 @@ whenToUse: <何时该用这个 skill>   # 可选；触发场景
 
 也就是说，只要通过启动脚本进入 DSH，`custom/skills/` 下的 skill（包括 `qt-screenshot`、
 `humanizer`、`continuous-learning`、`comment-log-doc-maintenance`、`ui-design`、
-`app-icon-gen`、`app-icon-template-creator`）就已经出现在 rank 400 的扫描根里，
+`app-icon-gen`、`app-icon-template-creator`、`agent-desktop`）就已经出现在 rank 400 的扫描根里，
 **无需手动配置 `customSkillDirs`，也无需手工复制目录**。
 
 > Windows 上创建目录联接需要相应权限（或开发者模式）；若脚本报联接失败，
@@ -105,6 +106,7 @@ cp -r <仓库根>/custom/skills/comment-log-doc-maintenance    "$HOME/.dsh/skill
 cp -r <仓库根>/custom/skills/ui-design                      "$HOME/.dsh/skills/"
 cp -r <仓库根>/custom/skills/app-icon-gen                   "$HOME/.dsh/skills/"
 cp -r <仓库根>/custom/skills/app-icon-template-creator      "$HOME/.dsh/skills/"
+cp -r <仓库根>/custom/skills/agent-desktop                 "$HOME/.dsh/skills/"
 
 # 或者建立目录链接，保持与仓库同步（Windows 上用 mklink /J 建目录联接）
 ln -s <仓库根>/custom/skills/qt-screenshot                  "$HOME/.dsh/skills/qt-screenshot"
@@ -114,6 +116,7 @@ ln -s <仓库根>/custom/skills/comment-log-doc-maintenance    "$HOME/.dsh/skill
 ln -s <仓库根>/custom/skills/ui-design                      "$HOME/.dsh/skills/ui-design"
 ln -s <仓库根>/custom/skills/app-icon-gen                   "$HOME/.dsh/skills/app-icon-gen"
 ln -s <仓库根>/custom/skills/app-icon-template-creator      "$HOME/.dsh/skills/app-icon-template-creator"
+ln -s <仓库根>/custom/skills/agent-desktop                 "$HOME/.dsh/skills/agent-desktop"
 ```
 
 注意：链接/复制过去的是 skill 目录本身，skill 正文里引用的仓库其他目录不会跟着过去。
@@ -130,6 +133,8 @@ ln -s <仓库根>/custom/skills/app-icon-template-creator      "$HOME/.dsh/skill
   必须保持**整个目录结构完整**（包括 `scripts/`、`references/`、`examples/` 等）。首次使用前，
   需在各自目录的 `scripts/` 下运行 `npm ci` 或 `npm install` 安装依赖（要求 Node.js >= 22）。
   此外，`app-icon-template-creator` 依赖 `app-icon-gen` 以及一个可用的图像生成能力，两者需同时可用。
+- `agent-desktop` 的 `SKILL.md` 不携带脚本，但要求本机已全局安装 `agent-desktop` CLI；
+  复制或联接过去只让 DSH 看见技能，CLI 本身仍需 `npm install -g agent-desktop`。
 
 ### 方式四：通过插件安装
 
@@ -145,5 +150,5 @@ ln -s <仓库根>/custom/skills/app-icon-template-creator      "$HOME/.dsh/skill
   配置后，配置变更需要**重启 DSH**；仅内容变化通常刷新会话（新建会话）即可。
 - 验证：新建一个会话，看会话开头的可用技能列表里是否出现 `qt-screenshot` / `humanizer` /
   `continuous-learning` / `comment-log-doc-maintenance` / `ui-design` / `app-icon-gen` /
-  `app-icon-template-creator`；或直接让 agent「列出可用 skill」。
+  `app-icon-template-creator` / `agent-desktop`；或直接让 agent「列出可用 skill」。
   DSH 日志里也会有解析告警，便于排查 frontmatter 写错的情况。

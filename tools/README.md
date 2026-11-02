@@ -11,6 +11,7 @@
 | 工具集 | 目录 | 用途 |
 | --- | --- | --- |
 | **Qt/QML 截图链路** | 本目录（`shoot.sh` 等） | 给 Qt/QML 桌面应用启动真实窗口，按窗口句柄抓图，用于视觉检查与多尺寸回归对比 |
+| **agent-desktop 桌面自动化 CLI** | 无（npm 全局安装，不在本仓库） | 通过 OS 无障碍树观察并操作原生桌面应用，供 agent 做 computer use；配套 skill 在 `custom/skills/agent-desktop/` |
 
 ## 工具集一：Qt/QML 窗口截图
 
@@ -223,3 +224,33 @@ selftest.sh --template <可用模板> [--module-dir <模块根>] [--work-dir <�
 5. 清理用 `taskkill //F //T //PID <winpid>`，只针对本次启动的进程；按镜像名杀进程只作兜底。
 6. 删除文件/目录必须显式开启（`--clean-*`）且校验目标在工作目录之内，禁止无保护的 `rm -rf`。
 7. 传给 Windows 原生命令的路径一律经 `cygpath -w -a` 转换。
+
+## 工具集二：agent-desktop 桌面自动化 CLI
+
+Vercel Labs 的桌面自动化命令行：通过操作系统无障碍树观察并操作原生桌面应用，不依赖视觉模型。
+它不在本目录——本仓库不保存其脚本或二进制，按 npm 全局安装后直接调用。
+
+### 安装与验证
+
+```bash
+npm install -g agent-desktop     # npm 包内自带预编译二进制（Windows x64/ARM64、macOS、Linux）
+agent-desktop version            # 成功时输出 {"ok":true,...,"version":"<版本>"}
+agent-desktop permissions --guide
+```
+
+- 二进制位置由 npm 前缀决定（`npm config get prefix`），随 npm 全局目录走，仓库内不留副本；
+- 未允许 npm 的 install script 时，命令会经 Node 启动器转发，每次多约 125 ms；
+  按提示执行 `npm install -g agent-desktop --allow-scripts=agent-desktop` 即可链接原生二进制；
+- 首次真正操作应用前先跑 `agent-desktop list-apps`，再跑
+  `agent-desktop snapshot --app "<应用名>" -i`：能返回紧凑 JSON 无障碍树才算接通。
+  Electron / Chromium 应用先加 `--max-depth 3` 限制深度。
+
+### 配套 skill 与接入
+
+- skill 在 `custom/skills/agent-desktop/`，正文取自二进制内嵌的官方说明，随安装版本更新；
+- `custom/launcher/link-skills.ps1` 把 `custom/skills/*` 联接进 `$DSH_HOME/skills`，重启 DSH 后即可被发现；
+- 它**不是 MCP 服务器**：不要写进 `cordis.patch.yml` 的 MCP 段，也不要 `git submodule add`。
+
+### 许可
+
+Apache-2.0。分发或修改需保留版权声明与许可证副本。
